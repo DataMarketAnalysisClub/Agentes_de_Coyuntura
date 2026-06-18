@@ -66,8 +66,11 @@ class BCentralClient:
             )
             response.raise_for_status()
             payload = response.json()
-        except Exception:
-            logger.warning("Failed to fetch BCentral series", extra={"series_id": series_id}, exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch BCentral series",
+                extra={"series_id": series_id, "error_type": type(exc).__name__},
+            )
             return None
 
         return self._latest_from_payload(series_id, payload)
