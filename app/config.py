@@ -26,6 +26,10 @@ class Settings(BaseSettings):
 
     bcentral_user: str = ""
     bcentral_password: str = ""
+    bcentral_credentials_file: str = ""
+    bcentral_tpm_series: str = "F022.TPM.TIN.D001.NO.Z.D"
+    bcentral_ipc_series: str = "F074.IPC.VAR.Z.Z.C.M"
+    bcentral_timeout_seconds: float = 20.0
     fred_api_key: str = ""
     alpha_vantage_api_key: str = ""
 
@@ -64,9 +68,29 @@ class Settings(BaseSettings):
         ]:
             path.mkdir(parents=True, exist_ok=True)
 
+    def load_bcentral_credentials_file(self) -> None:
+        """Load BCCh credentials from a two-line external file when configured."""
+
+        if self.bcentral_user and self.bcentral_password:
+            return
+        if not self.bcentral_credentials_file:
+            return
+
+        credentials_path = Path(self.bcentral_credentials_file).expanduser()
+        if not credentials_path.exists():
+            return
+
+        lines = [line.strip() for line in credentials_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if len(lines) >= 2:
+            if not self.bcentral_user:
+                self.bcentral_user = lines[0]
+            if not self.bcentral_password:
+                self.bcentral_password = lines[1]
+
 
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
+    settings.load_bcentral_credentials_file()
     settings.ensure_runtime_dirs()
     return settings
