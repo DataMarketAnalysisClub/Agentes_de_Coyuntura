@@ -8,6 +8,7 @@ Este repositorio implementa `dmac-market-brief-agent` para el Data Market Analys
 - Priorizar MVP estable sobre complejidad tecnica innecesaria.
 - No hardcodear credenciales, tokens, usuarios SMTP ni contrasenas.
 - Leer configuracion desde variables de entorno y `.env` local.
+- Leer credenciales BCCh desde `BCENTRAL_CREDENTIALS_FILE` cuando se use archivo externo; no imprimir su contenido.
 - Mantener compatibilidad con Docker y Docker Compose.
 - Si una fuente externa falla, registrar `warning` y continuar con las demas.
 - Registrar fuentes de datos y conservar historial auditable.

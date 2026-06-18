@@ -50,6 +50,7 @@ Variables principales:
 - `RSS_FEEDS=`: lista opcional de URLs RSS separadas por coma.
 - `HIGH_IMPACT_THRESHOLD=8`: umbral para generar alertas.
 - `ALERT_DEDUP_HOURS=3`: ventana de deduplicacion de alertas.
+- `BCENTRAL_CREDENTIALS_FILE=`: archivo externo con credenciales BCCh en dos lineas.
 
 SMTP:
 
@@ -60,6 +61,23 @@ SMTP:
 - `EMAIL_FROM`
 - `EMAIL_TO`
 - `EMAIL_CC`
+
+Banco Central de Chile:
+
+- `BCENTRAL_USER`: usuario BCCh. Puede omitirse si se usa `BCENTRAL_CREDENTIALS_FILE`.
+- `BCENTRAL_PASSWORD`: contrasena BCCh. Puede omitirse si se usa `BCENTRAL_CREDENTIALS_FILE`.
+- `BCENTRAL_CREDENTIALS_FILE`: ruta a archivo externo no versionado. Formato esperado: primera linea correo, segunda linea contrasena.
+- `BCENTRAL_TPM_SERIES`: serie para TPM. Default: `F022.TPM.TIN.D001.NO.Z.D`.
+- `BCENTRAL_IPC_SERIES`: serie para IPC/inflacion. Default: `F074.IPC.VAR.Z.Z.C.M`.
+- `BCENTRAL_TIMEOUT_SECONDS`: timeout HTTP para BCCh.
+
+Ejemplo local seguro:
+
+```bash
+BCENTRAL_CREDENTIALS_FILE=/home/brunoc/dev/dmac/credenciales.txt
+```
+
+No copies el contenido de ese archivo a Git ni a mensajes de error.
 
 ## Ejecucion Manual
 
