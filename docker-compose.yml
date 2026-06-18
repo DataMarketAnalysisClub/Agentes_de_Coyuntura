@@ -1,0 +1,14 @@
+services:
+  dmac-market-brief-agent:
+    build: .
+    container_name: dmac-market-brief-agent
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-America/Santiago}
+    volumes:
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+      - ./storage:/app/storage
+    restart: unless-stopped
+    command: ["python", "-m", "app.main", "scheduler"]
