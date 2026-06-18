@@ -25,6 +25,8 @@ def configure_logging(level: int = logging.INFO) -> None:
     root.handlers.clear()
     root.setLevel(level)
 
+    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
     root.addHandler(handler)

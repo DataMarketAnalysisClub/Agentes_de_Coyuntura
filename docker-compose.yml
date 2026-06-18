@@ -3,7 +3,8 @@ services:
     build: .
     container_name: dmac-market-brief-agent
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       TZ: ${TZ:-America/Santiago}
     volumes:
