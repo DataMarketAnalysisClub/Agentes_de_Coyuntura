@@ -1,4 +1,5 @@
 import logging
+import json
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Protocol
@@ -65,7 +66,7 @@ class BCentralClient:
                 timeout=self.settings.bcentral_timeout_seconds,
             )
             response.raise_for_status()
-            payload = response.json()
+            payload = json.loads(response.text)
         except Exception as exc:
             logger.warning(
                 "Failed to fetch BCentral series",
