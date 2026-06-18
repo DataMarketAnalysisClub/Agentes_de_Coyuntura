@@ -74,7 +74,7 @@ Banco Central de Chile:
 Ejemplo local seguro:
 
 ```bash
-BCENTRAL_CREDENTIALS_FILE=/home/brunoc/dev/dmac/credenciales.txt
+BCENTRAL_CREDENTIALS_FILE=/ruta/local/credenciales_bcch.txt
 ```
 
 No copies el contenido de ese archivo a Git ni a mensajes de error.
