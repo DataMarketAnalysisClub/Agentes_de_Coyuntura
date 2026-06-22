@@ -1,3 +1,5 @@
+"""High impact monitor: detects extreme news and sends styled alert emails."""
+
 import logging
 from pathlib import Path
 
@@ -12,9 +14,32 @@ from storage.repositories import AlertRepository
 logger = logging.getLogger(__name__)
 
 
+def _render_alert_html(
+    subject: str,
+    text_body: str,
+    snapshots,
+    news_items: list,
+    logo_path: str,
+) -> str:
+    link_map = (
+        {n.title: n.url for n in news_items if n.title and n.url}
+        if news_items
+        else {}
+    )
+    return build_email_html(
+        subject=subject,
+        text_body=text_body,
+        snapshots=snapshots,
+        news_items=news_items,
+        news_title="Noticia gatillante",
+        brief_kind="alerta de alto impacto",
+        news_link_map=link_map,
+        logo_path=logo_path,
+    )
+
+
 def run_high_impact_monitor_once() -> list[Alert]:
     """Evaluate recent market/news data and generate deduplicated high impact alerts."""
-
     settings = get_settings()
     now = chile_now(settings)
     snapshots, news = collect_market_and_news(news_hours=3)
@@ -30,7 +55,9 @@ def run_high_impact_monitor_once() -> list[Alert]:
 
         text_body = generate_alert_text(item, snapshots)
         subject = f"DMAC Alert | Alto impacto financiero | {item.title[:80]}"
-        html_body = build_email_html(subject, text_body)
+        html_body = _render_alert_html(
+            subject, text_body, snapshots, [item], settings.email_logo_path,
+        )
         alert = Alert(now, item.title, item.impact_score, text_body, sent=False)
         output_path = _write_alert(now, item.title, text_body, html_body)
         sent = EmailSender(settings).send(subject, text_body, html_body, settings.alert_email_enabled)

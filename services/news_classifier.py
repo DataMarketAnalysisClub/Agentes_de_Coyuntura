@@ -3,10 +3,10 @@ import unicodedata
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
+from functools import lru_cache
 
 from data_sources.rss_news_client import RawNewsItem
 from storage.models import NewsItem
-
 
 REGION_KEYWORDS: dict[str, tuple[str, ...]] = {
     "Chile": ("chile", "bcch", "banco central de chile", "cmf", "ipc", "imacec", "hacienda"),
@@ -31,6 +31,7 @@ TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
 }
 
 
+@lru_cache(maxsize=1024)
 def normalize_text(value: str) -> str:
     value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     value = re.sub(r"\s+", " ", value.lower()).strip()
@@ -53,8 +54,13 @@ def classify_topic(title: str, summary: str = "") -> str:
     return "macro general"
 
 
+@lru_cache(maxsize=512)
+def _similarity_ratio(left: str, right: str) -> float:
+    return SequenceMatcher(None, normalize_text(left), normalize_text(right)).ratio()
+
+
 def is_similar_title(left: str, right: str, threshold: float = 0.88) -> bool:
-    return SequenceMatcher(None, normalize_text(left), normalize_text(right)).ratio() >= threshold
+    return _similarity_ratio(left, right) >= threshold
 
 
 def deduplicate_news(items: Iterable[RawNewsItem]) -> list[RawNewsItem]:

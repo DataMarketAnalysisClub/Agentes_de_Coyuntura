@@ -3,7 +3,6 @@ from collections.abc import Iterable
 from services.news_classifier import is_similar_title, normalize_text
 from storage.models import MarketSnapshot, NewsItem
 
-
 RECOGNIZED_SOURCES = (
     "banco central",
     "cmf",
@@ -54,6 +53,7 @@ MOVEMENT_THRESHOLDS = {
 
 
 def score_asset_movements(snapshots: Iterable[MarketSnapshot]) -> int:
+    total = 0
     for snapshot in snapshots:
         if snapshot.change_pct is None:
             continue
@@ -63,9 +63,18 @@ def score_asset_movements(snapshots: Iterable[MarketSnapshot]) -> int:
         observed = abs(snapshot.change_pct)
         if snapshot.symbol == "US10Y":
             observed = abs(snapshot.change_pct * 100)
-        if observed >= threshold:
-            return 2
-    return 0
+
+        ratio = observed / threshold
+        if ratio >= 3:
+            total += 4
+        elif ratio >= 2:
+            total += 3
+        elif ratio >= 1.5:
+            total += 2
+        elif ratio >= 1:
+            total += 1
+
+    return min(total, 6)
 
 
 def count_similar_headlines(target: NewsItem, items: Iterable[NewsItem]) -> int:
@@ -81,8 +90,6 @@ def calculate_impact_score(
     snapshots: Iterable[MarketSnapshot] | None = None,
     all_news: Iterable[NewsItem] | None = None,
 ) -> int:
-    """Calculate a conservative 0-10 impact score for one news item."""
-
     score = 0
     source = normalize_text(item.source)
     text = normalize_text(f"{item.title} {item.summary} {item.topic} {item.region}")

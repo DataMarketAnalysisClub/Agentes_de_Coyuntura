@@ -7,8 +7,11 @@ from urllib.parse import urlparse
 import feedparser
 
 from app.config import Settings, get_settings
+from app.http_client import CircuitBreakerError, ResilientHttpClient
 
 logger = logging.getLogger(__name__)
+
+RSS_FEED_TIMEOUT = 20.0
 
 
 @dataclass(frozen=True)
@@ -27,16 +30,11 @@ class RawNewsItem:
 
 
 DEFAULT_RSS_FEEDS: tuple[RssFeed, ...] = (
-    RssFeed("Banco Central de Chile", "https://www.bcentral.cl/web/banco-central/rss"),
-    RssFeed("CMF Chile", "https://www.cmfchile.cl/portal/prensa/rss.xml"),
-    RssFeed("INE Chile", "https://www.ine.gob.cl/rss"),
-    RssFeed("Ministerio de Hacienda Chile", "https://www.hacienda.cl/rss"),
     RssFeed("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml"),
-    RssFeed("BLS", "https://www.bls.gov/feeds/news_release/bls_latest.rss"),
-    RssFeed("BEA", "https://www.bea.gov/news/glance/rss"),
     RssFeed("ECB", "https://www.ecb.europa.eu/rss/press.html"),
-    RssFeed("IMF", "https://www.imf.org/en/News/RSS"),
-    RssFeed("World Bank", "https://www.worldbank.org/en/news/all/rss"),
+    RssFeed("Financial Times", "https://www.ft.com/rss/home/international"),
+    RssFeed("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
+    RssFeed("Investing.com", "https://www.investing.com/rss/news.rss"),
 )
 
 
@@ -50,29 +48,71 @@ class RssNewsClient:
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
+        self._http_client: ResilientHttpClient | None = None
+
+    @property
+    def http_client(self) -> ResilientHttpClient:
+        if self._http_client is None:
+            self._http_client = ResilientHttpClient(
+                name="rss",
+                timeout=RSS_FEED_TIMEOUT,
+                retries=2,
+            )
+        return self._http_client
 
     def configured_feeds(self) -> tuple[RssFeed, ...]:
-        if self.settings.rss_feeds:
-            return tuple(_feed_from_url(url) for url in self.settings.rss_feeds)
+        if self.settings.rss_feeds_list:
+            return tuple(_feed_from_url(url) for url in self.settings.rss_feeds_list)
         return DEFAULT_RSS_FEEDS
 
     def fetch_latest(self) -> list[RawNewsItem]:
         items: list[RawNewsItem] = []
         for feed in self.configured_feeds():
             try:
-                parsed = feedparser.parse(feed.url)
-                if getattr(parsed, "bozo", False):
-                    logger.warning("RSS feed returned parse warning", extra={"source": feed.source})
-                for entry in parsed.entries[:30]:
-                    title = str(getattr(entry, "title", "")).strip()
-                    url = str(getattr(entry, "link", "")).strip()
-                    if not title or not url:
-                        continue
-                    summary = str(getattr(entry, "summary", "")).strip()
-                    timestamp = self._entry_timestamp(entry)
-                    items.append(RawNewsItem(timestamp, feed.source, title, url, summary))
+                feed_items = self._fetch_single_feed(feed)
+                items.extend(feed_items)
+            except CircuitBreakerError:
+                logger.warning(
+                    "Circuit breaker open for RSS feed, skipping",
+                    extra={"source": feed.source},
+                )
             except Exception:
-                logger.warning("Failed to fetch RSS feed", extra={"source": feed.source}, exc_info=True)
+                logger.warning(
+                    "Failed to fetch RSS feed",
+                    extra={"source": feed.source},
+                    exc_info=True,
+                )
+        return items
+
+    def _fetch_single_feed(self, feed: RssFeed) -> list[RawNewsItem]:
+        try:
+            response = self.http_client.get(feed.url)
+            xml_content = response.text
+        except Exception:
+            logger.warning(
+                "HTTP request failed for RSS feed, trying direct parse",
+                extra={"source": feed.source},
+            )
+            parsed = feedparser.parse(feed.url)
+        else:
+            parsed = feedparser.parse(xml_content)
+
+        if getattr(parsed, "bozo", False):
+            logger.warning(
+                "RSS feed returned parse warning",
+                extra={"source": feed.source},
+            )
+
+        items: list[RawNewsItem] = []
+        for entry in parsed.entries[:30]:
+            title = str(getattr(entry, "title", "")).strip()
+            url = str(getattr(entry, "link", "")).strip()
+            if not title or not url:
+                continue
+            summary = str(getattr(entry, "summary", "")).strip()
+            timestamp = self._entry_timestamp(entry)
+            items.append(RawNewsItem(timestamp, feed.source, title, url, summary))
+
         return items
 
     @staticmethod

@@ -45,30 +45,45 @@ DEFAULT_ASSETS: tuple[MarketAsset, ...] = (
 
 
 class YFinanceClient:
-    """Small yfinance wrapper that tolerates missing tickers."""
+    """Small yfinance wrapper that tolerates missing tickers and rate limits."""
 
     def fetch_quotes(self, assets: tuple[MarketAsset, ...] = DEFAULT_ASSETS) -> list[Quote]:
         quotes: list[Quote] = []
         for asset in assets:
-            try:
-                history = yf.Ticker(asset.yf_ticker).history(period="5d", interval="1d")
-                if history.empty or "Close" not in history:
-                    logger.warning("No yfinance data returned", extra={"symbol": asset.symbol})
-                    quotes.append(Quote(asset.symbol, asset.name, None, None))
-                    continue
-
-                closes = history["Close"].dropna()
-                if closes.empty:
-                    quotes.append(Quote(asset.symbol, asset.name, None, None))
-                    continue
-
-                price = float(closes.iloc[-1])
-                change_pct = None
-                if len(closes) >= 2 and float(closes.iloc[-2]) != 0:
-                    previous = float(closes.iloc[-2])
-                    change_pct = ((price - previous) / previous) * 100
-                quotes.append(Quote(asset.symbol, asset.name, price, change_pct))
-            except Exception:
-                logger.warning("Failed to fetch yfinance quote", extra={"symbol": asset.symbol}, exc_info=True)
-                quotes.append(Quote(asset.symbol, asset.name, None, None))
+            quote = self._fetch_one(asset)
+            quotes.append(quote)
         return quotes
+
+    @staticmethod
+    def _fetch_one(asset: MarketAsset) -> Quote:
+        try:
+            ticker = yf.Ticker(asset.yf_ticker)
+            history = ticker.history(period="5d", interval="1d", auto_adjust=False)
+        except Exception as exc:
+            logger.warning(
+                "yfinance request failed",
+                extra={"symbol": asset.symbol, "error": type(exc).__name__},
+            )
+            return Quote(asset.symbol, asset.name, None, None)
+
+        if history is None or history.empty or "Close" not in history:
+            logger.warning("No yfinance data returned", extra={"symbol": asset.symbol})
+            return Quote(asset.symbol, asset.name, None, None)
+
+        closes = history["Close"].dropna()
+        if closes.empty:
+            return Quote(asset.symbol, asset.name, None, None)
+
+        try:
+            price = float(closes.iloc[-1])
+            change_pct = None
+            if len(closes) >= 2 and float(closes.iloc[-2]) != 0:
+                previous = float(closes.iloc[-2])
+                change_pct = ((price - previous) / previous) * 100
+            return Quote(asset.symbol, asset.name, price, change_pct)
+        except (ValueError, TypeError) as exc:
+            logger.warning(
+                "Failed to parse yfinance close prices",
+                extra={"symbol": asset.symbol, "error": type(exc).__name__},
+            )
+            return Quote(asset.symbol, asset.name, None, None)

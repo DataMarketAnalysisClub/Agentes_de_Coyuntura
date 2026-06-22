@@ -3,7 +3,6 @@ from datetime import date
 from services.market_snapshot import format_market_line
 from storage.models import MarketSnapshot, NewsItem
 
-
 WATCH_SYMBOLS = ("USDCLP", "COPPER", "SP500", "VOO", "GOLD", "IPSA")
 
 

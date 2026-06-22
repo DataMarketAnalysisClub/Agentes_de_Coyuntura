@@ -13,7 +13,15 @@ class GeneratedBrief:
 
 def _select_symbols(snapshots: list[MarketSnapshot], symbols: tuple[str, ...]) -> list[str]:
     by_symbol = {snapshot.symbol: snapshot for snapshot in snapshots}
-    return [format_market_line(by_symbol[symbol]) for symbol in symbols if symbol in by_symbol]
+    lines: list[str] = []
+    for symbol in symbols:
+        snapshot = by_symbol.get(symbol)
+        if snapshot is None:
+            continue
+        if snapshot.price is None and snapshot.change_pct is None:
+            continue
+        lines.append(format_market_line(snapshot))
+    return lines
 
 
 def _top_news(news: list[NewsItem], region: str | None = None, limit: int = 3) -> list[str]:
@@ -33,16 +41,31 @@ def generate_morning_brief(
     news: list[NewsItem],
 ) -> GeneratedBrief:
     subject = f"DMAC Morning Brief | Coyuntura Financiera | {current_date:%Y-%m-%d}"
-    top = _top_news(news, limit=3)
+    top = _top_news(news, limit=8)
     executive = top or ["* Sin titulares recientes de alto impacto en las fuentes configuradas."]
 
     sections = [
-        "Estimados miembros DMAC,\n\nCompartimos el Morning Brief de coyuntura financiera del dia.",
         _section("1. Resumen ejecutivo", executive),
-        _section("2. Chile", _select_symbols(snapshots, ("USDCLP", "COPPER", "IPSA", "TPM", "IPC")) + _top_news(news, "Chile", 1)),
-        _section("3. Latam", _select_symbols(snapshots, ("BOVESPA", "MEXIPC", "USDBRL", "USDMXN", "USDCOP", "USDPEN")) + _top_news(news, "Latam", 1)),
-        _section("4. Estados Unidos", _select_symbols(snapshots, ("SP500", "VOO", "NASDAQ100", "US10Y", "DXY")) + _top_news(news, "EE.UU.", 1)),
-        _section("5. Internacional", _select_symbols(snapshots, ("GOLD", "WTI", "BRENT", "EUROSTOXX50")) + _top_news(news, "Global", 1)),
+        _section(
+            "2. Chile",
+            _select_symbols(snapshots, ("USDCLP", "COPPER", "IPSA", "TPM", "IPC"))
+            + _top_news(news, "Chile", 3),
+        ),
+        _section(
+            "3. Latam",
+            _select_symbols(snapshots, ("BOVESPA", "MEXIPC", "USDBRL", "USDMXN", "USDCOP", "USDPEN"))
+            + _top_news(news, "Latam", 3),
+        ),
+        _section(
+            "4. Estados Unidos",
+            _select_symbols(snapshots, ("SP500", "VOO", "NASDAQ100", "US10Y", "DXY"))
+            + _top_news(news, "EE.UU.", 3),
+        ),
+        _section(
+            "5. Internacional",
+            _select_symbols(snapshots, ("GOLD", "WTI", "BRENT", "EUROSTOXX50"))
+            + _top_news(news, "Global", 3),
+        ),
         _section(
             "6. Que mirar hoy",
             [
@@ -74,9 +97,8 @@ def generate_market_close(
         if snapshot.change_pct is not None and abs(snapshot.change_pct) >= 1.0
     ]
     sections = [
-        "Estimados miembros DMAC,\n\nCompartimos el Market Close de la jornada.",
         _section("1. Movimientos relevantes", relevant_moves),
-        _section("2. Posibles drivers", _top_news(news, limit=5)),
+        _section("2. Posibles drivers", _top_news(news, limit=8)),
         _section(
             "3. Lectura DMAC",
             [
