@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     email_from: str = ""
-    email_to: list[str] = Field(default_factory=list)
-    email_cc: list[str] = Field(default_factory=list)
+    email_to: str = ""
+    email_cc: str = ""
+    email_logo_path: str = "assets/Dmac_logo.png"
 
     bcentral_user: str = ""
     bcentral_password: str = ""
@@ -38,18 +39,51 @@ class Settings(BaseSettings):
 
     high_impact_threshold: int = 8
     alert_dedup_hours: int = 3
-    rss_feeds: list[str] = Field(default_factory=list)
+    rss_feeds: str = ""
+
+    ai_enabled: bool = False
+    ai_dry_run: bool = True
+    ai_strict_json: bool = True
+    ai_max_news_items: int = 30
+    ai_output_dir: str = "outputs/ai"
+    ai_max_groups: int = 6
+    ai_max_news_per_group: int = 10
+    ai_charts_enabled: bool = True
+    ai_max_charts: int = 4
+    ai_chart_output_dir: str = "outputs/ai/charts"
+    ai_brief_enabled: bool = False
+
+    ollama_base_url: str = "https://ollama.com"
+    ollama_api_key: str = ""
+    ollama_model: str = ""
+    ollama_timeout_seconds: float = 45.0
+    ollama_temperature: float = 0.2
+    ollama_max_retries: int = 2
 
     @field_validator("email_to", "email_cc", "rss_feeds", mode="before")
     @classmethod
-    def split_csv(cls, value: object) -> list[str]:
+    def _coerce_list_field(cls, value: object) -> object:
         if value is None or value == "":
+            return ""
+        return str(value)
+
+    @staticmethod
+    def _split_csv(value: str) -> list[str]:
+        if not value:
             return []
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return []
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    @property
+    def email_to_list(self) -> list[str]:
+        return self._split_csv(self.email_to)
+
+    @property
+    def email_cc_list(self) -> list[str]:
+        return self._split_csv(self.email_cc)
+
+    @property
+    def rss_feeds_list(self) -> list[str]:
+        return self._split_csv(self.rss_feeds)
 
     @property
     def sqlite_path(self) -> Path:
@@ -63,6 +97,7 @@ class Settings(BaseSettings):
             Path("outputs/briefs"),
             Path("outputs/alerts"),
             Path("outputs/whatsapp"),
+            Path("outputs/ai"),
             Path("logs"),
             Path("storage"),
         ]:
