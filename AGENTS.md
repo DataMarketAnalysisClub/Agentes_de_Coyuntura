@@ -40,3 +40,16 @@ Este repositorio implementa `dmac-market-brief-agent` para el Data Market Analys
 - Usar `pytest` para pruebas.
 - Usar `ruff` para estilo cuando se agregue CI.
 - Antes de commitear, revisar `git status`, `git diff` y tests relevantes.
+
+## MVP: visualizaciones IA
+
+Para el MVP, las visualizaciones IA (Plotly + PNG via base64 o cid) **NO** se
+embeben en el email productivo. Las visualizaciones en el email son solo las
+estaticas JS-free (asset table, barras de variacion %, distribucion por
+region) definidas en `services/email_charts.py`.
+
+El codigo de render IA (`services.ai.chart_renderer.render_charts_as_png`)
+sigue disponible para uso futuro. Para reactivar visualizaciones IA en el
+email, ver el comentario en `_build_nix_charts_cid_map` en
+`jobs/morning_brief.py` y `jobs/market_close.py`, y restaurar el bloque de
+render base64 en `_nix_analysis_section` de `services/email_formatter.py`.

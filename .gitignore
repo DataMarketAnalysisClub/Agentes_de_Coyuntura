@@ -1,6 +1,10 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
+
+credentials/
+app/credentials/
 
 __pycache__/
 *.py[cod]
@@ -15,6 +19,8 @@ htmlcov/
 outputs/briefs/*
 outputs/alerts/*
 outputs/whatsapp/*
+outputs/ai/*
+outputs/ai_test/*
 !outputs/briefs/.gitkeep
 !outputs/alerts/.gitkeep
 !outputs/whatsapp/.gitkeep
@@ -24,7 +30,11 @@ logs/*
 
 storage/*.db
 storage/*.db-*
+*.sqlite
+*.sqlite3
 !storage/.gitkeep
+
+correotipo.txt
 
 .DS_Store
 .idea/

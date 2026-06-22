@@ -11,5 +11,12 @@ services:
       - ./outputs:/app/outputs
       - ./logs:/app/logs
       - ./storage:/app/storage
+      - ./credentials:/app/credentials:ro
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from app.config import get_settings; get_settings()"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 1m
     command: ["python", "-m", "app.main", "scheduler"]
