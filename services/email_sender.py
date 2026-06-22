@@ -27,8 +27,19 @@ class EmailSender:
         text_body: str,
         html_body: str,
         enabled: bool,
+        inline_images: dict[str, bytes] | None = None,
     ) -> bool:
-        recipients = [*self.settings.email_to, *self.settings.email_cc]
+        """Send the email via SMTP.
+
+        `inline_images` is accepted for backward compatibility but ignored: the
+        HTML body must contain its images as inline base64 data URIs (handled
+        by the email_formatter). This avoids the cid: multipart/related
+        issues that break image rendering in Outlook mobile and Outlook web.
+        """
+        del inline_images  # deprecated: HTML is self-contained now
+        to_list = self.settings.email_to_list
+        cc_list = self.settings.email_cc_list
+        recipients = [*to_list, *cc_list]
         recipients_text = ",".join(recipients)
 
         if not enabled:
@@ -51,9 +62,9 @@ class EmailSender:
         message = EmailMessage()
         message["Subject"] = subject
         message["From"] = self.settings.email_from
-        message["To"] = ", ".join(self.settings.email_to)
-        if self.settings.email_cc:
-            message["Cc"] = ", ".join(self.settings.email_cc)
+        message["To"] = ", ".join(to_list)
+        if cc_list:
+            message["Cc"] = ", ".join(cc_list)
         message.set_content(text_body)
         message.add_alternative(html_body, subtype="html")
 
