@@ -11,7 +11,6 @@
 | Financial Times | RSS | ✅ 10 items |
 | MarketWatch | RSS | ✅ 10 items |
 | Investing.com | RSS | ✅ 10 items |
-| Ministerio Hacienda | Scraping | ✅ 10 items |
 | La Tercera Pulso | Scraping | ✅ 10 items |
 
 ---

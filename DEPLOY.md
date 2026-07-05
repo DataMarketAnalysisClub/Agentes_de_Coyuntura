@@ -11,7 +11,7 @@ remoto usando SSH + rsync + systemd + Docker.
 - Credenciales de produccion listas:
   - `OLLAMA_API_KEY` (cuenta Ollama Cloud)
   - `SMTP_PASSWORD` (Gmail app password, 16 caracteres)
-  - `EMAIL_TO` (destinatario final, ej. `brcarom@udd.cl`)
+  - `EMAIL_TO` (destinatario final, ej. `recipient@example.com`)
 - (Opcional) `BCENTRAL_CREDENTIALS_FILE` si tienes cuenta del Banco Central
 
 ## Paso 1: Preparar el bundle local
@@ -19,7 +19,7 @@ remoto usando SSH + rsync + systemd + Docker.
 Desde tu maquina de desarrollo, limpia archivos que NO deben ir al servidor:
 
 ```bash
-cd /home/brunoc/dev/dmac/Agentes_de_Coyuntura
+cd /path/to/dmac-market-brief-agent
 rm -rf outputs/* logs/* storage/*.db .ruff_cache .pytest_cache
 find . -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null
 find . -name "*.pyc" -delete
@@ -41,7 +41,7 @@ exit
 Desde tu maquina local:
 
 ```bash
-cd /home/brunoc/dev/dmac/Agentes_de_Coyuntura
+cd /path/to/dmac-market-brief-agent
 rsync -avz --delete \
   --exclude='.venv' \
   --exclude='__pycache__' \
@@ -76,10 +76,10 @@ DRY_RUN=false
 EMAIL_ENABLED=true
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=nix.assistant.bruno@gmail.com
+SMTP_USER=notifications@example.com
 SMTP_PASSWORD=<gmail app password>
-EMAIL_FROM=nix.assistant.bruno@gmail.com
-EMAIL_TO=brcarom@udd.cl
+EMAIL_FROM=notifications@example.com
+EMAIL_TO=recipient@example.com
 AI_ENABLED=true
 AI_BRIEF_ENABLED=true
 AI_CHARTS_ENABLED=true
@@ -153,7 +153,7 @@ docker compose exec dmac-market-brief-agent python -m app.main morning
 Verifica que:
 
 - Logs muestran "Email sent successfully" con el destinatario correcto
-- El email llega a `brcarom@udd.cl` con la card IA al inicio
+- El email llega al destinatario configurado en `EMAIL_TO` con la card IA al inicio
 - Las visualizaciones estaticas (asset table, bars, distribucion) se ven OK
 - NO hay bloque "Visualizaciones DMAC AI" con graficos IA (es MVP)
 
@@ -163,8 +163,8 @@ APScheduler dentro del container corre (America/Santiago):
 
 - **morning_brief**: lunes a viernes 08:30
 - **market_close**: lunes a viernes 18:30
-- **high_impact_monitor**: cada 15 minutos (revisa noticias de alto impacto
-  y envia alerta si corresponde)
+- **high_impact_monitor**: desactivado por defecto; solo se agenda si
+  `ALERT_MONITOR_ENABLED=true`
 
 ## Troubleshooting
 
@@ -178,7 +178,7 @@ APScheduler dentro del container corre (America/Santiago):
 
 ### Ollama falla
 
-1. `gpt-oss:120b` tarda 30-60s por llamada. Si Ollama Cloud esta lento o caido,
+1. `gpt-oss:120b` puede tardar decenas de segundos por llamada. Si Ollama Cloud esta lento o caido,
    el brief usa el fallback deterministico (secciones de `summarizer.py`)
 2. Verifica el API key: `docker compose exec dmac-market-brief-agent \
    python -c "import httpx; r=httpx.get('https://ollama.com', timeout=10); print(r.status_code)"`

@@ -13,7 +13,6 @@ Este repositorio implementa `dmac-market-brief-agent` para el Data Market Analys
 - Si una fuente externa falla, registrar `warning` y continuar con las demas.
 - Registrar fuentes de datos y conservar historial auditable.
 - Agregar tests para cambios relevantes.
-- No automatizar WhatsApp con librerias no oficiales. Solo generar texto copiable.
 - No hacer scraping agresivo ni intentar evadir paywalls.
 
 ## Finanzas Y Comunicacion

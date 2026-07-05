@@ -24,10 +24,10 @@ Tamano tipico del HTML: 60-80 KB (sin imagenes IA embebidas en MVP).
    - Seccion por region (Chile / Global / Reino Unido / EE.UU.) con texto + bullets
    - A vigilar (bullets)
    - Cautelas (bullets)
-3. **Asset table** (estatica, JS-free): Activo | Precio | Var % | Fuente
-4. **Variacion % de activos** (barras horizontales estaticas)
+3. **Sentimiento de mercado** (score 0-100, drivers, fuente)
+4. **Asset table** (estatica, JS-free): Activo | Precio | Var % | Fuente
 5. **Titulares por region** (barras horizontales estaticas)
-6. **Titulares principales** (lista con links a la fuente, region, impacto N/10)
+6. **Titulares principales** (lista ejecutiva con links a la fuente y region)
 7. **Footer** (disclaimer, "Nix Assistant, DMAC UDD", copyright)
 
 Las secciones deterministicas de `summarizer.py` (Resumen ejecutivo, Chile,
@@ -46,8 +46,8 @@ en `build_email_html` cuando hay IA.
    5. Internacional
    6. Que mirar hoy
    7. Lectura DMAC
-3. Asset table
-4. Variacion % de activos
+3. Sentimiento de mercado
+4. Asset table
 5. Titulares por region
 6. Titulares principales
 7. Footer
@@ -67,8 +67,9 @@ en `build_email_html` cuando hay IA.
 ### Estaticas (siempre presentes, JS-free)
 
 - **Asset table**: tabla HTML con `border: 1px solid`, `border-radius: 6px`
-- **Variacion % bars**: divs con `width: N%` y colores verde/rojo segun signo
-- **Titulares por region bars**: similar a variacion %
+- **Sentimiento de mercado**: barra 0-100 con drivers principales desde
+  `yfinance` y Google Finance cuando esta disponible
+- **Titulares por region bars**: divs con `width: N%` por cantidad de titulares
 - Renderizadas por `services/email_charts.py`
 
 Estas funcionan en TODOS los clientes de email sin problemas, incluyendo
@@ -154,7 +155,6 @@ ambos archivos lado a lado.
 - `MarketSnapshot` con `price=None` y `change_pct=None` se omite de la tabla
 - Si TODOS los snapshots estan vacios, la tabla muestra "Mercado cerrado o
   sin datos disponibles al momento."
-- `render_change_pct_bars` retorna string vacio si no hay cambios %
 - `render_news_distribution_bars` retorna string vacio si no hay noticias
 
 ## Metricas de envio
@@ -163,5 +163,5 @@ ambos archivos lado a lado.
 - Tamano HTML: 60-80 KB
 - Tamano total email: ~80-100 KB
 - Subject: `DMAC Morning Brief | Coyuntura Financiera | YYYY-MM-DD`
-- From: `nix.assistant.bruno@gmail.com`
-- To: `brcarom@udd.cl` (configurable via `EMAIL_TO`)
+- From: configurable via `EMAIL_FROM`
+- To: configurable via `EMAIL_TO`

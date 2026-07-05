@@ -1,18 +1,20 @@
 # dmac-market-brief-agent
 
-Agente de coyuntura financiera para el Data Market Analysis Club UDD. El proyecto recolecta datos de mercado, titulares economicos y eventos relevantes para generar Morning Brief, Market Close, alertas de alto impacto, correos automaticos y versiones cortas listas para copiar en WhatsApp.
+Agente de coyuntura financiera para el Data Market Analysis Club UDD. El proyecto recolecta datos de mercado, titulares economicos y eventos relevantes para generar Morning Brief, Market Close y correos HTML automaticos.
 
 El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes.
 
 ## Funcionalidades
 
-- Morning Brief diario con texto, HTML y WhatsApp.
+- Morning Brief diario con texto y correo HTML.
 - Market Close diario con movimientos relevantes y posibles drivers.
-- Monitor de alertas de alto impacto financiero.
+- Formato ejecutivo: maximo 3 titulares seleccionados por calidad editorial.
+- Seccion de sentimiento de mercado con visualizacion 0-100 y drivers principales.
+- Monitor de alertas de alto impacto financiero desactivado por defecto.
 - Analisis editorial IA (Ollama Cloud) que reemplaza el resumen deterministico
   cuando esta disponible.
-- Visualizaciones estaticas en el email (asset table, barras de variacion %,
-  distribucion por region). Render JS-free, compatibles con todos los clientes.
+- Visualizaciones estaticas en el email (asset table y distribucion por region).
+  Render JS-free, compatibles con todos los clientes.
 - Persistencia auditable en SQLite.
 - Envio SMTP opcional con `DRY_RUN` por defecto.
 - Tolerancia a fallas de APIs externas.
@@ -36,7 +38,7 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 - `storage/`: SQLite, modelos y repositorios.
 - `prompts/`: guias editoriales y prompts para agentes IA.
 - `prompts/ai/`: prompts operativos para Ollama Cloud.
-- `outputs/`: briefs, alertas y mensajes WhatsApp generados.
+- `outputs/`: briefs, alertas y artefactos IA generados.
 - `tests/`: tests unitarios sin llamadas externas.
 
 ### Fuentes de Datos
@@ -44,6 +46,9 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 **Datos economicos:**
 - BCCh API: TPM, IPC (requiere credenciales)
 - yfinance: precios de activos (USDCLP, COPPER, IPSA, SP500, etc.)
+- Google Finance: resumen publico best-effort para sentimiento de mercado
+  (indices, futuros, VIX y commodities). Si falla, el reporte continua con
+  `yfinance`.
 
 **Noticias RSS (5 fuentes funcionales):**
 - Federal Reserve (EE.UU. macro)
@@ -53,7 +58,6 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 - Investing.com (forex, commodities)
 
 **Noticias Chile (scraping):**
-- Ministerio de Hacienda: comunicados de politica fiscal
 - La Tercera Pulso: negocios y economia chilena
 
 ## IA y Ollama Cloud
@@ -132,11 +136,14 @@ Flujo:
 4. Email formatter: compone HTML + Markdown final
 
 Graficos disponibles:
-- `change_pct_bar`: variacion % de activos
 - `impact_ranking_bar`: ranking de noticias por impacto
 - `news_by_region_bar`: distribucion de noticias por region
 - `news_by_topic_bar`: distribucion de noticias por topic
 - `assets_table`: tabla de principales activos
+
+En el email productivo se usan visualizaciones JS-free: tabla de activos,
+sentimiento de mercado y distribucion regional de titulares. Los graficos IA se
+mantienen para preview/review, no se embeben en el email productivo.
 
 ### Fase 4: MVP Review Loop
 
@@ -186,10 +193,9 @@ A partir de v0.10 el score se endurece a v2 con 17 checks cualitativos:
 - Reserva 100/100 a corridas IA reales con charts
 
 Los graficos se limitan a `AI_MAX_CHARTS` (default 4) por prioridad editorial:
-1. `change_pct_bar` (variacion de activos)
-2. `impact_ranking_bar` (noticias por impacto)
-3. `assets_table` (tabla de activos)
-4. `news_by_region_bar` / `news_by_topic_bar`
+1. `impact_ranking_bar` (noticias por impacto)
+2. `assets_table` (tabla de activos)
+3. `news_by_region_bar` / `news_by_topic_bar`
 
 Para iteracion rapida sin esperar RSS/scraping:
 
@@ -309,7 +315,6 @@ Los archivos se guardan en:
 
 - `outputs/briefs/`
 - `outputs/alerts/`
-- `outputs/whatsapp/`
 
 ## Docker
 
@@ -331,8 +336,11 @@ El contenedor ejecuta `python -m app.main scheduler` por defecto y monta:
 Validar configuracion:
 
 ```bash
-docker compose config
+docker compose config --no-interpolate
 ```
+
+Evita ejecutar `docker compose config` sin `--no-interpolate` si tienes un
+`.env` real, porque Docker puede imprimir secretos expandidos en la salida.
 
 ## Deploy En Servidor (Produccion)
 
@@ -353,10 +361,10 @@ instalacion systemd, troubleshooting, actualizaciones) esta en
 
 - `SMTP_HOST=smtp.gmail.com`
 - `SMTP_PORT=587`
-- `SMTP_USER=nix.assistant.bruno@gmail.com`
+- `SMTP_USER=notifications@example.com`
 - `SMTP_PASSWORD=<Gmail App Password>`
-- `EMAIL_FROM=nix.assistant.bruno@gmail.com`
-- `EMAIL_TO=brcarom@udd.cl`
+- `EMAIL_FROM=notifications@example.com`
+- `EMAIL_TO=recipient@example.com`
 - `BCENTRAL_CREDENTIALS_FILE=/app/credentials/bcentral.txt`
 - `AI_ENABLED=true`
 - `AI_DRY_RUN=false`
@@ -366,7 +374,7 @@ instalacion systemd, troubleshooting, actualizaciones) esta en
 
 - Morning brief: lunes a viernes 08:30 America/Santiago.
 - Market close: lunes a viernes 18:30 America/Santiago.
-- High impact monitor: cada 15 minutos.
+- High impact monitor: desactivado por defecto. Solo corre si `ALERT_MONITOR_ENABLED=true`.
 
 Para troubleshooting detallado, comandos de monitoreo, backup, y updates
 futuros ver [DEPLOY.md](DEPLOY.md).
@@ -400,8 +408,7 @@ Para RSS, puedes usar `RSS_FEEDS` en `.env` con URLs separadas por coma.
 
 1. Agrega el ticker en `DEFAULT_ASSETS` de `data_sources/yfinance_client.py`.
 2. Si aplica, agrega umbral en `MOVEMENT_THRESHOLDS` de `services/impact_scoring.py`.
-3. Si debe aparecer en WhatsApp, agrega el simbolo en `WATCH_SYMBOLS`.
-4. Agrega o ajusta tests.
+3. Agrega o ajusta tests.
 
 ## Activar Correo
 
@@ -409,7 +416,7 @@ Para RSS, puedes usar `RSS_FEEDS` en `.env` con URLs separadas por coma.
 2. Define `EMAIL_TO` y opcionalmente `EMAIL_CC` separados por coma.
 3. Cambia `DRY_RUN=false`.
 4. Cambia `EMAIL_ENABLED=true` para briefs.
-5. Cambia `ALERT_EMAIL_ENABLED=true` para alertas.
+5. Mantén `ALERT_MONITOR_ENABLED=false` salvo que se requieran alertas manualmente.
 
 Nunca imprimas ni commitees credenciales.
 
@@ -449,7 +456,7 @@ No se realiza push automatico desde este proyecto.
 ## Roadmap
 
 - [x] Integracion BCCh API (TPM, IPC).
-- [x] Scraping de fuentes chilenas (Ministerio Hacienda, La Tercera Pulso).
+- [x] Scraping de fuente chilena activa (La Tercera Pulso).
 - [x] RSS feeds depurados (5 fuentes funcionales).
 - [x] Configuracion ruff y pytest.
 - [ ] Integracion mindicador.cl (indicadores secundarios).

@@ -57,7 +57,7 @@
 
 ### Verificado
 - 196/196 tests, ruff limpio.
-- Morning brief enviado por SMTP a `brcarom@udd.cl`: card IA al inicio,
+- Morning brief enviado por SMTP al destinatario configurado: card IA al inicio,
   visualizaciones estaticas presentes, sin bloque "Visualizaciones DMAC AI",
   email de ~60KB.
 
