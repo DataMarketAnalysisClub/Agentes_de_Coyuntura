@@ -26,40 +26,6 @@ def client(mock_http_client: MagicMock) -> ChileNewsClient:
 
 
 class TestChileNewsClient:
-    def test_scrapes_hacienda_news(self, client: ChileNewsClient, mock_http_client: MagicMock) -> None:
-        index_html = """
-        <html>
-        <body>
-            <a href="/noticias-y-eventos/noticias/test-noticia">Noticia de Hacienda</a>
-            <a href="/noticias-y-eventos/noticias/otra-noticia">Otra Noticia</a>
-        </body>
-        </html>
-        """
-        article_html = """
-        <html>
-        <body>
-            <article>
-                <time datetime="2026-06-20T10:00:00Z">20 Junio 2026</time>
-                <p>Resumen del comunicado oficial.</p>
-            </article>
-        </body>
-        </html>
-        """
-
-        def fake_get(url: str) -> FakeResponse:
-            if "/noticias/" in url:
-                return FakeResponse(article_html)
-            return FakeResponse(index_html)
-
-        mock_http_client.get.side_effect = fake_get
-
-        items = client._scrape_hacienda()
-
-        assert len(items) == 2
-        assert items[0].source == "Ministerio de Hacienda"
-        assert "Noticia de Hacienda" in items[0].title
-        assert "Resumen del comunicado" in items[0].summary
-
     def test_scrapes_latercera_pulso(self, client: ChileNewsClient, mock_http_client: MagicMock) -> None:
         html = """
         <html>
@@ -85,9 +51,13 @@ class TestChileNewsClient:
         assert len(items) >= 1
         assert items[0].source == "La Tercera Pulso"
 
-    def test_fetch_latest_handles_hacienda_exceptions_gracefully(self, client: ChileNewsClient) -> None:
-        with pytest.raises(Exception):
-            raise Exception("Network error")
+    def test_fetch_latest_only_uses_latercera_pulso(self, client: ChileNewsClient, mock_http_client: MagicMock) -> None:
+        mock_http_client.get.return_value = FakeResponse("<html></html>")
+
+        client.fetch_latest()
+
+        requested_urls = [call.args[0] for call in mock_http_client.get.call_args_list]
+        assert requested_urls == ["https://www.latercera.com/canal/pulso/"]
 
     def test_raw_news_item_structure(self) -> None:
         item = RawNewsItem(

@@ -32,7 +32,6 @@ class ChileNewsClient:
     def fetch_latest(self) -> list[RawNewsItem]:
         items: list[RawNewsItem] = []
         sources = [
-            ("Ministerio de Hacienda", self._scrape_hacienda),
             ("La Tercera Pulso", self._scrape_latercera_pulso),
         ]
         for source_name, scraper in sources:
@@ -45,103 +44,6 @@ class ChileNewsClient:
             except Exception:
                 logger.warning("Failed to scrape %s", source_name, exc_info=True)
         return items
-
-    def _scrape_hacienda(self) -> list[RawNewsItem]:
-        base_url = "https://www.hacienda.cl"
-        items: list[RawNewsItem] = []
-
-        try:
-            client = self._get_client()
-            response = client.get(f"{base_url}/noticias-y-eventos")
-            response.raise_for_status()
-        except Exception:
-            logger.warning("Failed to fetch Hacienda news page")
-            return []
-
-        from bs4 import BeautifulSoup
-
-        soup = BeautifulSoup(response.text, "lxml")
-        news_links: list[tuple[str, str, datetime | None]] = []
-
-        for link in soup.select('a[href*="/noticias-y-eventos/noticias/"]'):
-            href = link.get("href", "")
-            if not href:
-                continue
-            full_url = urljoin(base_url, href)
-            title = link.get_text(strip=True)
-            if title and full_url:
-                news_links.append((title, full_url, None))
-
-        for title, url, _ in news_links[:10]:
-            item = self._fetch_hacienda_article(url, title)
-            if item:
-                items.append(item)
-
-        return items
-
-    def _fetch_hacienda_article(self, url: str, fallback_title: str) -> RawNewsItem | None:
-        try:
-            client = self._get_client()
-            response = client.get(url)
-            response.raise_for_status()
-        except Exception:
-            logger.warning("Failed to fetch Hacienda article: %s", url)
-            return None
-
-        from bs4 import BeautifulSoup
-
-        soup = BeautifulSoup(response.text, "lxml")
-
-        timestamp = self._extract_hacienda_timestamp(soup)
-        summary = self._extract_hacienda_summary(soup)
-
-        return RawNewsItem(
-            timestamp=timestamp,
-            source="Ministerio de Hacienda",
-            title=fallback_title,
-            url=url,
-            summary=summary,
-        )
-
-    @staticmethod
-    def _extract_hacienda_timestamp(soup: Any) -> datetime:
-
-        time_tag = soup.select_one("article time[datetime], time[datetime], .date")
-        if time_tag:
-            dt_attr = time_tag.get("datetime") or time_tag.get("data-date")
-            if dt_attr:
-                try:
-                    dt = datetime.fromisoformat(dt_attr.replace("Z", "+00:00"))
-                    if dt.tzinfo is None:
-                        return dt.replace(tzinfo=UTC)
-                    return dt.astimezone(UTC)
-                except ValueError:
-                    pass
-
-        date_text = soup.select_one(".fecha, .date, time")
-        if date_text:
-            date_str = date_text.get_text(strip=True)
-            if date_str:
-                try:
-                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d de %B de %Y"):
-                        try:
-                            dt = datetime.strptime(date_str, fmt)
-                            return dt.replace(tzinfo=UTC)
-                        except ValueError:
-                            continue
-                except Exception:
-                    pass
-
-        return datetime.now(UTC)
-
-    @staticmethod
-    def _extract_hacienda_summary(soup: Any) -> str:
-        summary_tag = soup.select_one(
-            "article p, .contenido p, .field-name-body p, .articulo-contenido p"
-        )
-        if summary_tag:
-            return summary_tag.get_text(strip=True)[:500]
-        return ""
 
     def _scrape_latercera_pulso(self) -> list[RawNewsItem]:
         base_url = "https://www.latercera.com"
