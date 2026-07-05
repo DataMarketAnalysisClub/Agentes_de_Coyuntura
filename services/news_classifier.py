@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from data_sources.rss_news_client import RawNewsItem
 from storage.models import NewsItem
@@ -38,6 +39,40 @@ def normalize_text(value: str) -> str:
     return value
 
 
+TRACKING_QUERY_PREFIXES = ("utm_",)
+TRACKING_QUERY_NAMES = {"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src"}
+
+
+def canonicalize_url(value: str) -> str:
+    parsed = urlparse(value.strip())
+    if not parsed.scheme or not parsed.netloc:
+        return value.strip()
+
+    query = [
+        (key, val)
+        for key, val in parse_qsl(parsed.query, keep_blank_values=True)
+        if key.lower() not in TRACKING_QUERY_NAMES
+        and not any(key.lower().startswith(prefix) for prefix in TRACKING_QUERY_PREFIXES)
+    ]
+    path = parsed.path.rstrip("/") or "/"
+    return urlunparse(
+        (
+            parsed.scheme.lower(),
+            parsed.netloc.lower(),
+            path,
+            "",
+            urlencode(query, doseq=True),
+            "",
+        )
+    )
+
+
+def normalize_title(value: str) -> str:
+    value = normalize_text(value)
+    value = re.sub(r"[^a-z0-9 ]+", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
 def classify_region(title: str, summary: str = "") -> str:
     text = normalize_text(f"{title} {summary}")
     for region, keywords in REGION_KEYWORDS.items():
@@ -60,19 +95,28 @@ def _similarity_ratio(left: str, right: str) -> float:
 
 
 def is_similar_title(left: str, right: str, threshold: float = 0.88) -> bool:
-    return _similarity_ratio(left, right) >= threshold
+    return _similarity_ratio(normalize_title(left), normalize_title(right)) >= threshold
 
 
 def deduplicate_news(items: Iterable[RawNewsItem]) -> list[RawNewsItem]:
     seen_urls: set[str] = set()
     unique: list[RawNewsItem] = []
     for item in items:
-        if item.url in seen_urls:
+        canonical_url = canonicalize_url(item.url)
+        if canonical_url in seen_urls:
             continue
-        if any(is_similar_title(item.title, existing.title) for existing in unique):
+        if any(is_similar_title(item.title, existing.title, threshold=0.84) for existing in unique):
             continue
-        seen_urls.add(item.url)
-        unique.append(item)
+        seen_urls.add(canonical_url)
+        unique.append(
+            RawNewsItem(
+                timestamp=item.timestamp,
+                source=item.source,
+                title=item.title,
+                url=canonical_url,
+                summary=item.summary,
+            )
+        )
     return unique
 
 

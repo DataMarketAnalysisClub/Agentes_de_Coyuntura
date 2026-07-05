@@ -19,6 +19,21 @@ def test_calculate_impact_score_high_impact_macro_news() -> None:
     assert calculate_impact_score(item, snapshots, [item]) >= 8
 
 
+def test_unrelated_market_move_does_not_inflate_score() -> None:
+    item = NewsItem(
+        timestamp=datetime.now(UTC),
+        source="Federal Reserve",
+        title="Fed signals rates decision as inflation remains elevated",
+        url="https://example.com/fed",
+        summary="Central bank guidance remains in focus.",
+        region="EE.UU.",
+        topic="tasas",
+    )
+    snapshots = [MarketSnapshot(datetime.now(UTC), "COPPER", "Cobre", 4.0, 6.0, "mock")]
+
+    assert calculate_impact_score(item, snapshots, [item]) == 7
+
+
 def test_calculate_impact_score_caps_at_ten() -> None:
     item = NewsItem(
         timestamp=datetime.now(UTC),

@@ -51,6 +51,18 @@ MOVEMENT_THRESHOLDS = {
     "DXY": 0.8,
 }
 
+ASSET_TEXT_KEYWORDS = {
+    "USDCLP": ("usdclp", "usd clp", "dolar", "dollar", "peso", "fx", "currency"),
+    "COPPER": ("cobre", "copper", "commodity", "commodities"),
+    "GOLD": ("oro", "gold", "commodity", "commodities"),
+    "SP500": ("s&p", "sp500", "s p 500", "wall street", "stocks", "equity", "markets", "mercados"),
+    "VOO": ("s&p", "sp500", "s p 500", "wall street", "stocks", "equity", "markets", "mercados"),
+    "NASDAQ100": ("nasdaq", "tech", "tecnologia", "stocks", "equity", "markets", "mercados"),
+    "IPSA": ("ipsa", "acciones chilenas", "bolsa chilena", "stocks", "equity", "mercados"),
+    "US10Y": ("treasury", "yield", "tasas", "rates", "bonos", "bonds"),
+    "DXY": ("dxy", "dolar", "dollar", "fx", "currency"),
+}
+
 
 def score_asset_movements(snapshots: Iterable[MarketSnapshot]) -> int:
     total = 0
@@ -77,6 +89,15 @@ def score_asset_movements(snapshots: Iterable[MarketSnapshot]) -> int:
     return min(total, 6)
 
 
+def score_related_asset_movements(snapshots: Iterable[MarketSnapshot], text: str) -> int:
+    related = [
+        snapshot
+        for snapshot in snapshots
+        if any(keyword in text for keyword in ASSET_TEXT_KEYWORDS.get(snapshot.symbol, ()))
+    ]
+    return score_asset_movements(related)
+
+
 def count_similar_headlines(target: NewsItem, items: Iterable[NewsItem]) -> int:
     return sum(
         1
@@ -99,7 +120,7 @@ def calculate_impact_score(
     if any(keyword in text for keyword in HIGH_IMPACT_KEYWORDS):
         score += 2
     if snapshots:
-        score += score_asset_movements(snapshots)
+        score += score_related_asset_movements(snapshots, text)
     if item.topic in MACRO_TOPICS or "central" in text:
         score += 2
     if item.region in {"Latam", "EE.UU.", "Global"}:
