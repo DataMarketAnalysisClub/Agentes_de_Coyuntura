@@ -38,7 +38,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///storage/dmac_market_brief.db"
 
     high_impact_threshold: int = 8
+    alert_monitor_enabled: bool = False
     alert_dedup_hours: int = 3
+    news_mention_lookback_hours: int = 720
     rss_feeds: str = ""
 
     ai_enabled: bool = False
@@ -55,7 +57,7 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "https://ollama.com"
     ollama_api_key: str = ""
-    ollama_model: str = ""
+    ollama_model: str = "gpt-oss:120b"
     ollama_timeout_seconds: float = 45.0
     ollama_temperature: float = 0.2
     ollama_max_retries: int = 2
@@ -96,7 +98,6 @@ class Settings(BaseSettings):
         for path in [
             Path("outputs/briefs"),
             Path("outputs/alerts"),
-            Path("outputs/whatsapp"),
             Path("outputs/ai"),
             Path("logs"),
             Path("storage"),

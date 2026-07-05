@@ -65,15 +65,11 @@ def write_output_bundle(
     stem: str,
     text_body: str,
     html_body: str,
-    whatsapp_body: str,
 ) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     text_path = directory / f"{stem}.txt"
     html_path = directory / f"{stem}.html"
-    whatsapp_path = Path("outputs/whatsapp") / f"{stem}.txt"
-    whatsapp_path.parent.mkdir(parents=True, exist_ok=True)
 
     text_path.write_text(text_body, encoding="utf-8")
     html_path.write_text(html_body, encoding="utf-8")
-    whatsapp_path.write_text(whatsapp_body, encoding="utf-8")
     return text_path

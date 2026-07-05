@@ -50,14 +50,66 @@ class NewsRepository:
                 inserted += cursor.rowcount
         return inserted
 
+    def recent_mentions(self, now: datetime, lookback_hours: int) -> list[NewsItem]:
+        since = now - timedelta(hours=lookback_hours)
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT timestamp, source, title, url, summary, region, topic, impact_score
+                FROM news_mentions
+                WHERE mentioned_at >= ?
+                ORDER BY mentioned_at DESC
+                """,
+                (_iso(since),),
+            ).fetchall()
+        return [
+            NewsItem(
+                timestamp=datetime.fromisoformat(row["timestamp"]),
+                source=row["source"],
+                title=row["title"],
+                url=row["url"],
+                summary=row["summary"] or "",
+                region=row["region"] or "Global",
+                topic=row["topic"] or "macro general",
+                impact_score=row["impact_score"] or 0,
+            )
+            for row in rows
+        ]
+
+    def save_mentions(self, items: list[NewsItem], mentioned_at: datetime) -> None:
+        if not items:
+            return
+        with get_connection() as connection:
+            connection.executemany(
+                """
+                INSERT INTO news_mentions
+                (mentioned_at, timestamp, source, title, url, summary, region, topic, impact_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        _iso(mentioned_at),
+                        _iso(item.timestamp),
+                        item.source,
+                        item.title,
+                        item.url,
+                        item.summary,
+                        item.region,
+                        item.topic,
+                        item.impact_score,
+                    )
+                    for item in items
+                ],
+            )
+
 
 class BriefRepository:
     def save(self, brief: Brief) -> None:
         with get_connection() as connection:
             connection.execute(
                 """
-                INSERT INTO briefs (timestamp, type, subject, text_body, html_body, whatsapp_body, output_path)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO briefs (timestamp, type, subject, text_body, html_body, output_path)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     _iso(brief.timestamp),
@@ -65,7 +117,6 @@ class BriefRepository:
                     brief.subject,
                     brief.text_body,
                     brief.html_body,
-                    brief.whatsapp_body,
                     brief.output_path,
                 ),
             )

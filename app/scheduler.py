@@ -19,6 +19,9 @@ def start_scheduler() -> None:
     scheduler = BlockingScheduler(timezone=settings.tz)
     scheduler.add_job(run_morning_brief, "cron", day_of_week="mon-fri", hour=8, minute=30, id="morning_brief")
     scheduler.add_job(run_market_close, "cron", day_of_week="mon-fri", hour=18, minute=30, id="market_close")
-    scheduler.add_job(run_high_impact_monitor_once, "interval", minutes=15, id="high_impact_monitor")
+    if settings.alert_monitor_enabled:
+        scheduler.add_job(run_high_impact_monitor_once, "interval", minutes=15, id="high_impact_monitor")
+    else:
+        logger.info("High impact monitor disabled")
     logger.info("Scheduler started", extra={"timezone": settings.tz})
     scheduler.start()

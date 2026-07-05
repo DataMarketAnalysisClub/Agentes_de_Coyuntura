@@ -13,10 +13,11 @@ from services.email_formatter import (
     build_email_html,
 )
 from services.email_sender import EmailSender
+from services.market_sentiment import collect_market_sentiment
+from services.news_selection import select_executive_news
 from services.summarizer import generate_market_close
-from services.whatsapp_formatter import format_whatsapp_brief
 from storage.models import Brief
-from storage.repositories import BriefRepository
+from storage.repositories import BriefRepository, NewsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -125,30 +126,48 @@ def run_market_close() -> Brief:
     settings = get_settings()
     now = chile_now(settings)
     snapshots, news = collect_market_and_news(news_hours=24)
+    market_sentiment = collect_market_sentiment(snapshots)
+    news_repository = NewsRepository()
+    mentioned_news = news_repository.recent_mentions(now, settings.news_mention_lookback_hours)
+    selection = select_executive_news(news, mentioned_news=mentioned_news, limit=3)
+    selected_news = selection.selected
 
-    generated = generate_market_close(now.date(), snapshots, news)
-    top_news = [n for n in news if n.impact_score][:5]
-    nix_analysis_html, nix_chart_pngs = _generate_nix_analysis(news, snapshots, settings)
+    logger.info(
+        "Executive news selected",
+        extra={
+            "total_candidates": selection.total_candidates,
+            "selected": len(selected_news),
+            "rejected_repeated": selection.rejected_repeated,
+            "rejected_quality": selection.rejected_quality,
+            "rejected_caps": selection.rejected_caps,
+            "sentiment": market_sentiment.label,
+            "sentiment_score": market_sentiment.score,
+        },
+    )
+
+    generated = generate_market_close(now.date(), snapshots, selected_news, market_sentiment)
+    nix_analysis_html, nix_chart_pngs = _generate_nix_analysis(selected_news, snapshots, settings)
     nix_charts_inline = _build_nix_charts_cid_map(nix_chart_pngs)
     html_body = build_email_html(
         generated.subject,
         generated.text_body,
         snapshots=snapshots,
-        news_items=top_news,
+        news_items=selected_news,
         news_title="Titulares del cierre",
         brief_kind="market close",
-        news_link_map=_build_news_link_map(news),
+        news_link_map=_build_news_link_map(selected_news),
         logo_path=settings.email_logo_path,
         nix_analysis_html=nix_analysis_html or None,
         nix_chart_pngs=nix_charts_inline or None,
         include_deterministic_brief=not bool(nix_analysis_html),
+        market_sentiment=market_sentiment,
     )
-    whatsapp_body = format_whatsapp_brief("Market Close", now.date(), snapshots, news)
     stem = f"market_close_{now:%Y%m%d_%H%M%S}"
-    output_path = write_output_bundle(Path("outputs/briefs"), stem, generated.text_body, html_body, whatsapp_body)
+    output_path = write_output_bundle(Path("outputs/briefs"), stem, generated.text_body, html_body)
 
-    brief = Brief(now, "market_close", generated.subject, generated.text_body, html_body, whatsapp_body, str(output_path))
+    brief = Brief(now, "market_close", generated.subject, generated.text_body, html_body, str(output_path))
     BriefRepository().save(brief)
+    news_repository.save_mentions(selected_news, now)
     EmailSender(settings).send(
         generated.subject,
         generated.text_body,

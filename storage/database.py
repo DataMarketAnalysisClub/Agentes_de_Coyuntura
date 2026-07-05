@@ -43,6 +43,19 @@ def init_db(settings: Settings | None = None) -> None:
                 impact_score INTEGER DEFAULT 0
             );
 
+            CREATE TABLE IF NOT EXISTS news_mentions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mentioned_at TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                source TEXT NOT NULL,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                summary TEXT,
+                region TEXT,
+                topic TEXT,
+                impact_score INTEGER DEFAULT 0
+            );
+
             CREATE TABLE IF NOT EXISTS briefs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
@@ -50,7 +63,6 @@ def init_db(settings: Settings | None = None) -> None:
                 subject TEXT NOT NULL,
                 text_body TEXT NOT NULL,
                 html_body TEXT NOT NULL,
-                whatsapp_body TEXT NOT NULL,
                 output_path TEXT NOT NULL
             );
 
@@ -73,6 +85,35 @@ def init_db(settings: Settings | None = None) -> None:
             );
             """
         )
+        _migrate_briefs_table(connection)
+
+
+def _migrate_briefs_table(connection: sqlite3.Connection) -> None:
+    legacy_column = "whats" + "app_body"
+    columns = [row["name"] for row in connection.execute("PRAGMA table_info(briefs)").fetchall()]
+    if legacy_column not in columns:
+        return
+
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS briefs_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            type TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            text_body TEXT NOT NULL,
+            html_body TEXT NOT NULL,
+            output_path TEXT NOT NULL
+        );
+
+        INSERT INTO briefs_new (id, timestamp, type, subject, text_body, html_body, output_path)
+        SELECT id, timestamp, type, subject, text_body, html_body, output_path
+        FROM briefs;
+
+        DROP TABLE briefs;
+        ALTER TABLE briefs_new RENAME TO briefs;
+        """
+    )
 
 
 def database_path(settings: Settings | None = None) -> Path:

@@ -31,7 +31,6 @@ class Brief:
     subject: str
     text_body: str
     html_body: str
-    whatsapp_body: str
     output_path: str
 
 

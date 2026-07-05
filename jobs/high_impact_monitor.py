@@ -41,6 +41,10 @@ def _render_alert_html(
 def run_high_impact_monitor_once() -> list[Alert]:
     """Evaluate recent market/news data and generate deduplicated high impact alerts."""
     settings = get_settings()
+    if not settings.alert_monitor_enabled:
+        logger.info("High impact monitor disabled")
+        return []
+
     now = chile_now(settings)
     snapshots, news = collect_market_and_news(news_hours=3)
     repository = AlertRepository()

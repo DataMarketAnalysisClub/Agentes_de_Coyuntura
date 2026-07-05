@@ -27,3 +27,15 @@ def test_bcentral_env_credentials_take_precedence(tmp_path: Path) -> None:
 
     assert settings.bcentral_user == "env-user@example.com"
     assert settings.bcentral_password == "env-secret"
+
+
+def test_alert_monitor_disabled_by_default() -> None:
+    settings = Settings()
+
+    assert settings.alert_monitor_enabled is False
+
+
+def test_news_mention_lookback_default() -> None:
+    settings = Settings()
+
+    assert settings.news_mention_lookback_hours == 720
