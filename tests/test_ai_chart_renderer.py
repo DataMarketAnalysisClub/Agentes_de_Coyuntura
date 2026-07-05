@@ -53,7 +53,7 @@ def _make_news(count: int = 5) -> list[NewsItem]:
 class TestChartRenderer:
     def test_available_chart_ids_with_full_data(self) -> None:
         ids = available_chart_ids(_make_snapshots(), _make_news())
-        assert "change_pct_bar" in ids
+        assert "change_pct_bar" not in ids
         assert "impact_ranking_bar" in ids
         assert "news_by_region_bar" in ids
         assert "news_by_topic_bar" in ids

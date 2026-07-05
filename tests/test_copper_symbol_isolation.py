@@ -111,8 +111,8 @@ class TestCopperSymbolIsolation:
         leaked = {f for f in files_with_hgf if f not in allowed}
         assert not leaked, f"HG=F found in unexpected files: {leaked}"
 
-    def test_available_chart_ids_with_copper_snapshot(self) -> None:
-        """available_chart_ids should include change_pct_bar when COPPER has data."""
+    def test_available_chart_ids_omit_change_pct_bar(self) -> None:
+        """Productive chart catalog should not offer the asset variation bar."""
         snaps = [
             MarketSnapshot(
                 timestamp=datetime.now(UTC),
@@ -124,5 +124,5 @@ class TestCopperSymbolIsolation:
             ),
         ]
         ids = available_chart_ids(snaps, [])
-        assert "change_pct_bar" in ids
+        assert "change_pct_bar" not in ids
         assert "assets_table" in ids

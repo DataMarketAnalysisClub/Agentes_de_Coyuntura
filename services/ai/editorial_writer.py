@@ -168,11 +168,10 @@ def _limit_chart_specs(email: AiEditorialEmail, max_charts: int) -> AiEditorialE
 def _prioritize_chart_ids(chart_ids: list[str], max_charts: int) -> list[str]:
     """Order chart ids by editorial priority and limit to max_charts.
 
-    Priority: change_pct_bar > impact_ranking_bar > assets_table >
-    news_by_region_bar > news_by_topic_bar.
+    Priority: impact_ranking_bar > assets_table > news_by_region_bar >
+    news_by_topic_bar.
     """
     priority = [
-        "change_pct_bar",
         "impact_ranking_bar",
         "assets_table",
         "news_by_region_bar",
@@ -567,13 +566,6 @@ def _deterministic_chart_specs(available_ids: list[str]) -> list:
     from services.ai.schemas import AiChartSpec
 
     specs_by_id = {
-        "change_pct_bar": AiChartSpec(
-            chart_id="change_pct_bar",
-            chart_type="bar_change_pct",
-            title="Variacion % de activos",
-            subtitle="Cierre reciente",
-            source_label="Datos: yfinance",
-        ),
         "impact_ranking_bar": AiChartSpec(
             chart_id="impact_ranking_bar",
             chart_type="bar_impact_ranking",

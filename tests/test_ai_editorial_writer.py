@@ -138,9 +138,9 @@ class TestEditorialWriter:
         valid_json = (
             '{"status":"ok","generated_at":"2026-06-20T12:00:00Z",'
             '"subject":"DMAC","headline":"Coyuntura",'
-            '"sections":[{"heading":"Chile","chart_ids":["change_pct_bar","unknown_id"]}],'
+            '"sections":[{"heading":"Chile","chart_ids":["assets_table","unknown_id"]}],'
             '"chart_specs":['
-            '{"chart_id":"change_pct_bar","chart_type":"bar_change_pct","title":"X"},'
+            '{"chart_id":"assets_table","chart_type":"table_assets","title":"X"},'
             '{"chart_id":"unknown_id","chart_type":"bar_change_pct","title":"Y"}'
             ']}'
         )
@@ -158,18 +158,18 @@ class TestEditorialWriter:
             )
         assert result.response is not None
         assert len(result.response.chart_specs) == 1
-        assert result.response.chart_specs[0].chart_id == "change_pct_bar"
-        assert result.response.sections[0].chart_ids == ["change_pct_bar"]
+        assert result.response.chart_specs[0].chart_id == "assets_table"
+        assert result.response.sections[0].chart_ids == ["assets_table"]
 
     def test_deterministic_editorial_basic(self) -> None:
         report = _make_report()
-        email = build_deterministic_editorial(report, _make_snapshots(), ["change_pct_bar"])
+        email = build_deterministic_editorial(report, _make_snapshots(), ["assets_table"])
         assert email.status == "ok"
         assert email.subject != ""
         assert email.sections[0].heading == "Chile"
         assert any("deterministic" in c.lower() for c in email.editorial_cautions)
         assert len(email.chart_specs) == 1
-        assert email.chart_specs[0].chart_id == "change_pct_bar"
+        assert email.chart_specs[0].chart_id == "assets_table"
         assert any(s.heading == "Visualizaciones" for s in email.sections)
 
     def test_deterministic_editorial_market_context(self) -> None:

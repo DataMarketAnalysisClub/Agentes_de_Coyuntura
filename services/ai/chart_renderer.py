@@ -32,7 +32,6 @@ class ChartRenderError(Exception):
 # writer prompt exposes these as AVAILABLE_CHART_IDS. The id is decoupled from
 # chart_type so the IA can suggest a chart by stable id.
 CHART_CATALOG: dict[str, str] = {
-    "change_pct_bar": "bar_change_pct",
     "impact_ranking_bar": "bar_impact_ranking",
     "news_by_region_bar": "bar_news_by_region",
     "news_by_topic_bar": "bar_news_by_topic",
@@ -48,8 +47,6 @@ def available_chart_ids(
     snaps = snapshots or []
     items = news or []
     ids: list[str] = []
-    if any(s.change_pct is not None for s in snaps):
-        ids.append("change_pct_bar")
     if any(n.impact_score for n in items):
         ids.append("impact_ranking_bar")
     if items:

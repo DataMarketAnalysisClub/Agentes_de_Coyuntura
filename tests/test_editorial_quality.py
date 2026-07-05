@@ -78,7 +78,7 @@ class TestEditorialStructure:
             phase2 = run_phase2_pipeline(news, max_news=10)
 
         assert phase2.report is not None
-        email = build_deterministic_editorial(phase2.report, snaps, ["change_pct_bar"], news)
+        email = build_deterministic_editorial(phase2.report, snaps, ["assets_table"], news)
 
         all_text: list[str] = []
         for s in email.sections:
@@ -104,7 +104,7 @@ class TestEditorialStructure:
             phase2 = run_phase2_pipeline(news, max_news=10)
 
         assert phase2.report is not None
-        email = build_deterministic_editorial(phase2.report, snaps, ["change_pct_bar"], news)
+        email = build_deterministic_editorial(phase2.report, snaps, ["assets_table"], news)
 
         import re
         pattern = re.compile(r"^\s*\[\d+\]\s*")
@@ -152,7 +152,7 @@ class TestEditorialStructure:
             phase2 = run_phase2_pipeline(news, max_news=10)
 
         assert phase2.report is not None
-        email = build_deterministic_editorial(phase2.report, snaps, ["change_pct_bar"], news)
+        email = build_deterministic_editorial(phase2.report, snaps, ["assets_table"], news)
 
         assert email.headline != "Coyuntura regional y de mercados"
         assert "marcan la jornada" in email.headline or "lidera la jornada" in email.headline or "foco en" in email.headline
@@ -171,7 +171,7 @@ class TestEditorialStructure:
             phase2 = run_phase2_pipeline(news, max_news=10)
 
         assert phase2.report is not None
-        email = build_deterministic_editorial(phase2.report, snaps, ["change_pct_bar"], news)
+        email = build_deterministic_editorial(phase2.report, snaps, ["assets_table"], news)
 
         assert len(email.subject) <= 80
         assert "DMAC" in email.subject or "Coyuntura" in email.subject
@@ -190,7 +190,7 @@ class TestEditorialStructure:
             phase2 = run_phase2_pipeline(news, max_news=10)
 
         assert phase2.report is not None
-        email = build_deterministic_editorial(phase2.report, snaps, ["change_pct_bar"], news)
+        email = build_deterministic_editorial(phase2.report, snaps, ["assets_table"], news)
 
         assert "cobre" in email.subject.lower() or "cobre" in email.headline.lower()
 
@@ -208,7 +208,7 @@ class TestEditorialStructure:
             phase2 = run_phase2_pipeline(news, max_news=10)
 
         assert phase2.report is not None
-        email = build_deterministic_editorial(phase2.report, snaps, ["change_pct_bar"], news)
+        email = build_deterministic_editorial(phase2.report, snaps, ["assets_table"], news)
 
         assert email.headline.strip() != ""
         assert len(email.preheader) <= 120
@@ -464,7 +464,7 @@ class TestQualityScore:
             heading="Chile",
             body=["En Chile se observaron 1 hechos relevantes del dia."],
             bullets=["Hecho A"],
-            chart_ids=["change_pct_bar"],
+            chart_ids=["assets_table"],
             cautions=["Cautela 1"],
         )
         email = AiEditorialEmail(
@@ -477,9 +477,9 @@ class TestQualityScore:
             market_context=["USD/CLP: +1.50%"],
             sections=[section],
             risk_flags=[],
-            chart_specs=[AiChartSpec(chart_id="change_pct_bar",
-                                     chart_type="bar_change_pct",
-                                     title="Variacion % de activos")],
+            chart_specs=[AiChartSpec(chart_id="assets_table",
+                                     chart_type="table_assets",
+                                     title="Principales activos")],
             source_notes=["Federal Reserve", "Hacienda", "ECB"],
             editorial_cautions=["Cautela general"],
         )
