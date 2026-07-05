@@ -204,7 +204,6 @@ def render_news_list(
         )
         meta = (
             f"{escape(item.source)} &middot; {escape(item.region or 'Global')}"
-            f" &middot; Impacto {item.impact_score}/10"
         )
         if url:
             meta = (
@@ -244,6 +243,53 @@ def render_chart_section(chart_id: str, chart_html: str) -> str:
     )
 
 
+def render_market_sentiment_section(sentiment) -> str:
+    if sentiment is None:
+        return ""
+    score = max(0, min(100, int(getattr(sentiment, "score", 50))))
+    label = str(getattr(sentiment, "label", "Neutral"))
+    summary = str(getattr(sentiment, "summary", ""))
+    source = str(getattr(sentiment, "source", ""))
+    drivers = list(getattr(sentiment, "drivers", []) or [])[:4]
+    color = _sentiment_color(score)
+    driver_html = "".join(
+        f"<li style=\"margin: 0 0 4px 0;\">{escape(str(driver))}</li>"
+        for driver in drivers
+    )
+    if not driver_html:
+        driver_html = "<li style=\"margin: 0 0 4px 0;\">Sin drivers dominantes.</li>"
+
+    return (
+        "<tr><td style=\"padding: 20px 24px 0 24px;\">"
+        f"<h2 style=\"margin: 0 0 12px 0; font-size: 15px; color: {DMAC_BRAND_PRIMARY_DARK};"
+        " letter-spacing: 0.02em; text-transform: uppercase;\">Sentimiento de mercado</h2>"
+        f"<div style=\"background: {DMAC_CARD}; border: 1px solid {DMAC_BORDER};"
+        " border-radius: 8px; padding: 14px 14px 12px 14px;\">"
+        f"<div style=\"display: flex; align-items: baseline; justify-content: space-between; gap: 12px;\">"
+        f"<div style=\"font-size: 18px; font-weight: 700; color: {color};\">{escape(label)}</div>"
+        f"<div style=\"font-size: 13px; font-weight: 700; color: {DMAC_TEXT};\">{score}/100</div>"
+        "</div>"
+        f"<div style=\"margin: 10px 0 8px 0; height: 10px; background: {DMAC_BG};"
+        " border-radius: 999px; overflow: hidden;\">"
+        f"<div style=\"width: {score}%; height: 10px; background: {color}; border-radius: 999px;\"></div>"
+        "</div>"
+        f"<p style=\"margin: 0 0 8px 0; color: {DMAC_TEXT}; font-size: 13px; line-height: 1.45;\">"
+        f"{escape(summary)}</p>"
+        f"<ul style=\"margin: 0; padding-left: 18px; color: {DMAC_TEXT}; font-size: 12px; line-height: 1.45;\">"
+        f"{driver_html}</ul>"
+        f"<div style=\"margin-top: 8px; font-size: 11px; color: {DMAC_MUTED};\">Fuente: {escape(source)}</div>"
+        "</div></td></tr>"
+    )
+
+
+def _sentiment_color(score: int) -> str:
+    if score >= 56:
+        return DMAC_POSITIVE
+    if score <= 44:
+        return DMAC_NEGATIVE
+    return DMAC_NEUTRAL
+
+
 def _header_html(subject: str, intro: str, logo_path: str = "") -> str:
     logo_html = get_logo_img_tag(logo_path, width=48)
     subtitle = (
@@ -275,12 +321,12 @@ def _footer_html() -> str:
         f"{DMAC_MUTED}; line-height: 1.55;\">"
         "Reporte generado automaticamente por <strong>DMAC Market Brief Agent</strong>."
         " Hechos observados se basan en titulares publicos y precios de mercado al momento"
-        " de la corrida. Cualquier interpretacion es preliminar y no constituye"
+        " del envío. Cualquier interpretacion es preliminar y no constituye"
         " recomendacion de inversion.</p>"
         f"<p style=\"margin: 12px 0 0 0; font-size: 13px; color: {DMAC_TEXT};"
         " font-weight: 600; line-height: 1.4;\">Nix Assistant, DMAC UDD.</p>"
         f"<p style=\"margin: 2px 0 0 0; font-size: 12px; color: {DMAC_MUTED};"
-        " line-height: 1.4;\">Equipo de Coyuntura y Datos.</p>"
+        " line-height: 1.4;\">Equipo de Datos y Coyuntura.</p>"
         f"<p style=\"margin: 12px 0 0 0; font-size: 11px; color: {DMAC_MUTED};\">"
         f"&copy; {__import__('datetime').datetime.now().year} Data Market Analysis Club UDD</p>"
         "</td></tr>"
@@ -288,13 +334,13 @@ def _footer_html() -> str:
 
 
 def _build_intro_paragraph(intro_lines: list[str], brief_kind: str) -> str:
-    """Build the friendly intro line: 'Estimado Equipo, les comparto el ...'."""
+    """Build the friendly intro line: 'Equipo, les comparto el ...'."""
     raw = " ".join(line for line in intro_lines if line).strip()
     if not raw:
-        return f"Estimado Equipo, les comparto el {brief_kind} de hoy."
-    if "Estimado Equipo" in raw or "les comparto" in raw.lower():
+        return f"Equipo, les comparto el {brief_kind} de hoy."
+    if "Equipo" in raw or "les comparto" in raw.lower():
         return raw
-    return f"Estimado Equipo, les comparto el {brief_kind} de hoy.\n{raw}"
+    return f"Equipo, les comparto el {brief_kind} de hoy.\n{raw}"
 
 
 def build_email_html(
@@ -310,6 +356,7 @@ def build_email_html(
     nix_analysis_html: str | None = None,
     nix_chart_pngs: dict[str, bytes] | None = None,
     include_deterministic_brief: bool = True,
+    market_sentiment=None,
 ) -> str:
     """Build a professional HTML email from text body, snapshots, and AI analysis.
 
@@ -322,9 +369,6 @@ def build_email_html(
     """
     from services.email_charts import (
         render_assets_table as _render_assets_table,
-    )
-    from services.email_charts import (
-        render_change_pct_bars as _render_change_pct_bars,
     )
     from services.email_charts import (
         render_news_distribution_bars as _render_news_distribution_bars,
@@ -347,6 +391,10 @@ def build_email_html(
             _nix_analysis_section(nix_analysis_html, nix_chart_pngs),
         )
 
+    sentiment_html = render_market_sentiment_section(market_sentiment)
+    if sentiment_html:
+        section_rows.append(sentiment_html)
+
     if include_deterministic_brief:
         section_rows.extend(
             _render_section_html(block, links=news_link_map or {})
@@ -355,9 +403,6 @@ def build_email_html(
 
     if include_charts and snapshots:
         section_rows.append(_render_assets_table(snapshots))
-        bars = _render_change_pct_bars(snapshots)
-        if bars:
-            section_rows.append(bars)
         if news_items:
             dist = _render_news_distribution_bars(news_items, by="region")
             if dist:
@@ -405,8 +450,8 @@ def _nix_analysis_section(
     `nix_chart_pngs` is accepted for backward compatibility but ignored in the
     MVP: AI-suggested charts are NOT embedded in the productive email. The
     rendering code (`services.ai.chart_renderer.render_charts_as_png`) remains
-    available for future use; the static JS-free bars in the email body
-    (asset table, variation %, news distribution) cover visualisation needs
+    available for future use; the static JS-free visuals in the email body
+    (asset table, market sentiment, news distribution) cover visualisation needs
     for now.
     """
     del nix_chart_pngs  # intentionally unused in MVP
@@ -434,7 +479,7 @@ def _nix_analysis_section(
         " font-weight: 700; letter-spacing: 0.01em;\">Analisis de Nix</h2>"
         f"<div style=\"font-size: 10px; color: rgba(255,255,255,0.85);"
         " letter-spacing: 0.08em; text-transform: uppercase;\">"
-        "Generado por Ollama Cloud / DMAC AI</div>"
+        "Generado por Nix Assistant / DMAC AI</div>"
         "</td></tr>"
         f"<tr><td style=\"padding: 14px 18px 16px 18px; color: {DMAC_TEXT};"
         f" font-size: 13px; line-height: 1.6;\">" + nix_content + "</td></tr>"

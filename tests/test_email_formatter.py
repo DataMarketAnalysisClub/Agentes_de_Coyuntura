@@ -60,6 +60,7 @@ def test_build_email_html_includes_assets_table_when_data_available() -> None:
     assert "+1.50%" in html
     assert "-0.80%" in html
     assert "yfinance" in html
+    assert "Variacion % de activos" not in html
 
 
 def test_build_email_html_skips_deterministic_brief_when_ia_present() -> None:
@@ -115,3 +116,47 @@ def test_build_email_html_omits_ia_charts_for_mvp() -> None:
     assert "data:image/png;base64," not in html
     assert "Visualizaciones DMAC AI" not in html
     assert "cid:" not in html
+
+
+def test_build_email_html_hides_internal_impact_scores() -> None:
+    from datetime import UTC, datetime
+
+    from storage.models import NewsItem
+
+    news = [
+        NewsItem(
+            timestamp=datetime.now(UTC),
+            source="Federal Reserve",
+            title="Fed signals rates decision",
+            url="https://example.com/fed",
+            summary="",
+            region="EE.UU.",
+            topic="tasas",
+            impact_score=9,
+        )
+    ]
+
+    html = build_email_html("DMAC", "Resumen", news_items=news, news_title="Titulares")
+
+    assert "Fed signals rates decision" in html
+    assert "Impacto" not in html
+    assert "9/10" not in html
+
+
+def test_build_email_html_includes_market_sentiment_section() -> None:
+    from services.market_sentiment import MarketSentiment
+
+    sentiment = MarketSentiment(
+        label="Riesgo positivo",
+        score=72,
+        summary="Sentimiento riesgo positivo por S&P 500 y VIX.",
+        drivers=["S&P 500: +1.20%", "VIX: +4.00%"],
+        source="yfinance + Google Finance",
+    )
+
+    html = build_email_html("DMAC", "Resumen", market_sentiment=sentiment)
+
+    assert "Sentimiento de mercado" in html
+    assert "Riesgo positivo" in html
+    assert "72/100" in html
+    assert "Google Finance" in html

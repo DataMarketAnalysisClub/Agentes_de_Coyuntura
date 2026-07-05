@@ -17,12 +17,8 @@ from services.email_formatter import (
     DMAC_BRAND_PRIMARY_DARK,
     DMAC_CARD,
     DMAC_MUTED,
-    DMAC_NEGATIVE,
-    DMAC_NEUTRAL,
-    DMAC_POSITIVE,
     DMAC_TEXT,
     _color_for_change,
-    _format_change,
     _format_price,
 )
 from storage.models import MarketSnapshot
@@ -39,56 +35,6 @@ def _bar(value: float, max_abs: float, color: str) -> str:
     return (
         f'<div style="width: {width_pct}%; background: {color}; height: 10px;'
         f' border-radius: 2px; min-width: 2px;"></div>'
-    )
-
-
-def render_change_pct_bars(snapshots: list[MarketSnapshot]) -> str:
-    """Render a clean horizontal bar chart of % change per asset.
-
-    Only assets with a non-null change_pct are shown. Returns an empty string
-    if there is no data to display.
-    """
-    rows: list[tuple[str, str, float, str]] = []
-    for snap in snapshots:
-        if snap.change_pct is None:
-            continue
-        rows.append((
-            escape(snap.name or snap.symbol),
-            escape(snap.symbol),
-            snap.change_pct,
-            _color_for_change(snap.change_pct),
-        ))
-
-    if not rows:
-        return ""
-
-    rows.sort(key=lambda r: r[2])
-    max_abs = max(abs(r[2]) for r in rows) or 1.0
-
-    body_rows: list[str] = []
-    for name, symbol, change, color in rows:
-        body_rows.append(
-            "<tr>"
-            f"<td style=\"padding: 6px 12px 6px 0; width: 35%; vertical-align: middle;\">"
-            f"<div style=\"font-weight: 600; color: {DMAC_TEXT}; font-size: 12px;\">{name}</div>"
-            f"<div style=\"font-size: 10px; color: {DMAC_MUTED};\">{symbol}</div></td>"
-            f"<td style=\"padding: 6px 8px; width: 45%; vertical-align: middle;\">"
-            f"{_bar(change, max_abs, color)}"
-            "</td>"
-            f"<td style=\"padding: 6px 0 6px 8px; width: 20%; text-align: right; vertical-align: middle;"
-            f" color: {color}; font-weight: 600; font-size: 12px;\">{_format_change(change)}</td>"
-            "</tr>"
-        )
-
-    return (
-        "<tr><td style=\"padding: 20px 24px 0 24px;\">"
-        f"<h2 style=\"margin: 0 0 12px 0; font-size: 15px; color: {DMAC_BRAND_PRIMARY_DARK};"
-        " letter-spacing: 0.02em; text-transform: uppercase;\">Variacion % de activos</h2>"
-        "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
-        f" style=\"width: 100%; border-collapse: collapse; background: {DMAC_CARD};"
-        f" border: 1px solid {DMAC_BORDER}; border-radius: 6px; overflow: hidden;\">"
-        f"{''.join(body_rows)}"
-        "</table></td></tr>"
     )
 
 
@@ -151,7 +97,7 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
         if snap.price is None and snap.change_pct is None:
             continue
         price = _format_price(snap.price)
-        change = _format_change(snap.change_pct)
+        change = "s/d" if snap.change_pct is None else f"{snap.change_pct:+.2f}%"
         change_color = _color_for_change(snap.change_pct)
         rows.append((
             escape(snap.name or snap.symbol),
@@ -209,8 +155,3 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
         f"{header}{''.join(body_rows)}"
         "</table></td></tr>"
     )
-
-
-def _unused_color_constants() -> tuple[str, ...]:
-    """Keep the unused-name linter happy for symbol exports."""
-    return (DMAC_POSITIVE, DMAC_NEGATIVE, DMAC_NEUTRAL)
