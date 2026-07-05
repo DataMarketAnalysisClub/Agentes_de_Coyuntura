@@ -1,41 +1,79 @@
+# Environment / local config
 .env
 .env.*
 !.env.example
 !.env.production.example
+.envrc
 
+# Credentials / secrets
 credentials/
 app/credentials/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
+.eggs/
+build/
+dist/
 .venv/
+venv/
+env/
+
+# Test / lint / coverage caches
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+junit.xml
 
+# Runtime outputs
 outputs/briefs/*
 outputs/alerts/*
-outputs/whatsapp/*
 outputs/ai/*
 outputs/ai_test/*
 !outputs/briefs/.gitkeep
 !outputs/alerts/.gitkeep
-!outputs/whatsapp/.gitkeep
 
+# Logs
 logs/*
+*.log
+*.out
+*.err
 !logs/.gitkeep
 
+# SQLite / local persistence
 storage/*.db
 storage/*.db-*
+*.db
+*.db-*
 *.sqlite
 *.sqlite3
+*.sqlite3-*
 !storage/.gitkeep
 
+# Local generated files / scratch
 correotipo.txt
+*.tmp
+*.temp
+*.bak
+*.orig
+*.swp
 
+# Notebooks
+.ipynb_checkpoints/
+
+# OS / IDE
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
