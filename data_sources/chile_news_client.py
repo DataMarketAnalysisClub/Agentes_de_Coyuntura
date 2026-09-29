@@ -1,7 +1,9 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 from app.http_client import CircuitBreakerError, ResilientHttpClient
@@ -19,6 +21,14 @@ LATERCERA_PULSO_RSS_URL = f"{LATERCERA_BASE_URL}/arc/outboundfeeds/rss/category/
 LATERCERA_PULSO_HTML_URL = f"{LATERCERA_BASE_URL}/canal/pulso/"
 LATERCERA_MAX_ITEMS = 20
 
+# RSS de portada de Diario Financiero: ~50 notas con fecha. Solo se usan
+# titulo, bajada y link del feed (no se descarga el articulo: DF tiene
+# paywall). Se conservan las secciones de hechos economicos; Opinion (cartas,
+# columnas, editorial), Regiones y suplementos quedan fuera.
+DF_RSS_URL = "https://www.df.cl/noticias/site/list/port/rss.xml"
+DF_ALLOWED_SECTIONS = frozenset({"mercados", "economia-y-politica", "empresas", "internacional", "primer-click"})
+DF_MAX_ITEMS = 20
+
 
 class ChileNewsClient:
     """Scraping client for Chilean news sources."""
@@ -26,10 +36,12 @@ class ChileNewsClient:
     def __init__(self, http_client: ResilientHttpClient | None = None) -> None:
         self._http_client = http_client
 
-    def _get_client(self) -> ResilientHttpClient:
+    def _get_client(self, name: str = "chile_news") -> ResilientHttpClient:
+        # Un circuit breaker por medio: pybreaker bloquea durante toda la
+        # llamada, y uno compartido serializaria las fuentes en paralelo.
         if self._http_client is None:
             return ResilientHttpClient(
-                name="chile_news",
+                name=name,
                 timeout=SCRAPE_TIMEOUT_SECONDS,
                 retries=2,
             )
@@ -39,13 +51,16 @@ class ChileNewsClient:
         pass
 
     def fetch_latest(self) -> list[RawNewsItem]:
-        items: list[RawNewsItem] = []
         sources = [
             ("La Tercera Pulso", self._fetch_latercera_pulso),
+            ("Diario Financiero", self._fetch_df),
         ]
-        for source_name, scraper in sources:
+        with ThreadPoolExecutor(max_workers=len(sources)) as executor:
+            futures = [(source_name, executor.submit(scraper)) for source_name, scraper in sources]
+        items: list[RawNewsItem] = []
+        for source_name, future in futures:
             try:
-                scraped = scraper()
+                scraped = future.result()
                 items.extend(scraped)
                 logger.info("Scraped %d items from %s", len(scraped), source_name)
             except CircuitBreakerError:
@@ -53,6 +68,25 @@ class ChileNewsClient:
             except Exception:
                 logger.warning("Failed to scrape %s", source_name, exc_info=True)
         return items
+
+    def _fetch_df(self) -> list[RawNewsItem]:
+        try:
+            response = self._get_client("df_news").get(DF_RSS_URL)
+            items = parse_feed(response.content, "Diario Financiero")
+        except CircuitBreakerError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch Diario Financiero RSS",
+                extra={"error_type": type(exc).__name__, "error": str(exc)},
+            )
+            return []
+        selected = [
+            replace(item, url=item.url.replace("http://", "https://", 1))
+            for item in items
+            if _df_section(item.url) in DF_ALLOWED_SECTIONS
+        ]
+        return selected[:DF_MAX_ITEMS]
 
     def _fetch_latercera_pulso(self) -> list[RawNewsItem]:
         """RSS primero; el scraping del HTML queda solo como respaldo."""
@@ -166,3 +200,8 @@ class ChileNewsClient:
                     pass
 
         return datetime.now(UTC)
+
+
+def _df_section(url: str) -> str:
+    """Primer segmento de la ruta: "mercados" en df.cl/mercados/bolsa-monedas/..."""
+    return urlparse(url).path.strip("/").split("/", 1)[0]
