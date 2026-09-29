@@ -269,7 +269,7 @@ Requiere Python 3.11 o superior.
 ```bash
 python3.11 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements-dev.txt  # incluye pytest y ruff
 cp .env.example .env
 ```
 
@@ -297,6 +297,22 @@ SMTP:
 - `EMAIL_FROM`
 - `EMAIL_TO`
 - `EMAIL_CC`
+- `OPS_EMAIL_TO`: mantenedores que reciben los avisos de salud de fuentes
+  (separados por coma). Vacio: los cambios de estado solo quedan en el log.
+  Nunca se usa la lista del club para estos avisos.
+
+Salud de fuentes:
+
+Cada corrida (manana, cierre y monitor) compara lo que llego contra lo
+esperado: feeds sin notas o con notas viejas, activos sin precio o con saltos
+poco plausibles. Una fuente cambia de estado tras dos corridas malas seguidas
+y se avisa a `OPS_EMAIL_TO`. El correo muestra el ultimo precio valido
+rotulado "al DD-MM" cuando un activo no trae datos, y lista las fuentes sin
+datos al final. Estado actual:
+
+```bash
+python -m app.main health
+```
 
 Banco Central de Chile:
 
@@ -485,7 +501,7 @@ No se realiza push automatico desde este proyecto.
 - [x] yfinance: series de 1 mes y sparklines en el correo.
 - [ ] Mejor deduplicacion semantica de noticias.
 - [ ] PostgreSQL opcional para despliegue compartido.
-- [ ] CI con pytest y ruff.
+- [x] CI con pytest y ruff (`.github/workflows/ci.yml`).
 - [ ] Panel web simple de auditoria historica.
 
 ## Notas De Riesgo

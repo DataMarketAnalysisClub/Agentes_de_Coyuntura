@@ -1,65 +1,64 @@
-# Handoff: sesion 2026-09-29
+# Handoff: sesion 2026-09-29 (tarde)
 
-Estado para retomar el trabajo en otra sesion. Rama
-`feat/v0.14-market-data-news-charts`. Todo esta commiteado localmente
-(sesiones 2026-09-28 y 2026-09-29), **sin push**: el push lo hace el
-usuario; Claude tiene prohibido hacer push. Detalle en
-`CHANGELOG.md` (entradas "Unreleased" y 0.14.0) y pendientes en
-`NEXT_STEPS.md`.
+Estado para retomar el trabajo en otra sesion. Rama `feat/source-health`
+(creada desde `main` = `origin/main`), commiteada **localmente, sin push**:
+el merge y el push los hace el usuario; Claude tiene prohibido hacer push.
+Detalle en `CHANGELOG.md` ("Unreleased") y pendientes en `NEXT_STEPS.md`.
 
-## Sesion 2026-09-28 (resumen)
+## Antes (ya integrado en `main` por el usuario)
 
-Outlook desktop, retiro de Google Finance y stubs muertos, scraping en
-paralelo, yfinance 1.7.0 reparado con sparklines de 1 mes, y la seccion
-"En foco" (graficos elegidos por los titulares). Ver 0.14.0 en el changelog.
+- 2026-09-28: Outlook desktop, retiro de Google Finance, scraping en
+  paralelo, yfinance 1.7.0 con sparklines, seccion "En foco".
+- 2026-09-29 (manana): clasificador con limites de palabra, Diario
+  Financiero, BCCh desempleo y USD/PEN, lectura de Nix en "En foco".
 
-## Sesion 2026-09-29: que se hizo
+## Esta sesion: salud de fuentes
 
-Decisiones del usuario: implementar la lectura de Nix por grafico (paso a),
-sacar USD/PEN del BCCh y sumar la tasa de desempleo, y agregar el RSS de DF.
+Motivo (decision estrategica con el usuario): los problemas reales del
+proyecto fueron degradaciones silenciosas (yfinance roto meses, `^IPSA`
+eliminado, `PEN=X` inconsistente, fechas de Investing, `NaN` del BCCh), no
+caidas. La regla "warning y continuar" las volvia invisibles.
 
-1. **Clasificador con limites de palabra** (`services/news_classifier.py`):
-   plural opcional, prefijos explicitos (`geopolit*`), excepcion para el IPC
-   de Mexico y "US" en mayusculas (no "US$") como EE.UU.
-2. **Diario Financiero** en `ChileNewsClient`: RSS de portada filtrado por
-   seccion de la URL; las fuentes chilenas corren en paralelo.
-3. **BCCh**: desempleo (`F049.DES.TAS.INE9.10.M`) y USD/PEN
-   (`F072.PEN.USD.N.O.D`, con historia de 1 mes). USD/PEN salio de
-   `DEFAULT_ASSETS` de yfinance. El cliente ya no filtra `NaN`
-   erroneamente, no deja clientes HTTP abiertos, pide en paralelo y nunca
-   loguea credenciales.
-4. **Lectura de Nix en "En foco"** (`services/ai/news_chart_readings.py`,
-   prompt `prompts/ai/news_chart_reading.md`): una llamada chica a la IA
-   por correo, solo con los graficos ya elegidos; se valida simbolo,
-   largo y lenguaje de recomendacion. Los jobs pasan `news_charts` a
-   `build_email_html`.
+1. `services/source_health.py` (puro): chequeo por fuente esperada. Caida
+   = 0 notas o sin precio; degradada = nota mas reciente vieja (48 h; 7 dias
+   Fed/BCE) o salto de precio > 25%. Histeresis: 2 corridas malas para
+   cambiar, 1 buena para volver.
+2. `services/source_health_report.py` + tablas `source_health` (30 dias) y
+   `source_state`; comando `python -m app.main health`. Se registra desde
+   `collect_market_and_news` (cubre manana, cierre y monitor) y nunca
+   interrumpe el brief.
+3. Aviso a `OPS_EMAIL_TO` (vacio = solo log): un correo por corrida con
+   cambios de estado. `EmailSender.send(recipients=...)`.
+4. Correo: ultimo dato valido (<= 5 dias) rotulado "al DD-MM" y linea
+   "Sin datos en esta edicion: ...". Solo para mostrar
+   (`CollectionResult.display_snapshots`); IA, sentimiento e impacto usan los
+   datos de hoy y el respaldo no se persiste.
+5. CI (`.github/workflows/ci.yml`) y `requirements-dev.txt` (pytest y ruff
+   fuera de la imagen Docker).
 
-## Decisiones tomadas (no re-discutir sin motivo)
+## Decisiones del usuario (no re-discutir sin motivo)
 
-- Las de la sesion anterior siguen vigentes (seleccion deterministica,
-  graficos HTML/CSS, sin reintento por ticker ante batch vacio, "dolar" vs
-  "dollar").
-- DF: solo titulo, bajada y link del RSS; Opinion queda fuera (es
-  interpretacion, no hechos).
-- La lectura de Nix va rotulada "Lectura de Nix (IA)" para separar
-  interpretacion de datos.
+- `OPS_EMAIL_TO` lo configura el usuario en el `.env` del servidor.
+- Linea discreta al lector con fuentes sin datos: si.
+- Ultimo dato valido rotulado con fecha: si.
+- La IA nunca recibe el dato de respaldo (lo presentaria como de hoy).
 
 ## Verificacion
 
-- 286 tests pasan en Python 3.11 con los pins; `ruff check .` limpio.
-- Morning brief local (sin correo, sin credenciales BCCh, IA apagada):
-  73 KB, "En foco" presente.
-- **No verificado en vivo**: series BCCh nuevas (no hay credenciales en la
-  maquina de desarrollo) y la lectura de Nix con Ollama real.
-- Entorno: `.venv` (ignorado por git) creado con
-  `mise exec python@3.11 -- python -m venv .venv && .venv/bin/pip install -r requirements.txt`.
+- 314 tests pasan en Python 3.11; `ruff check .` limpio. Flujo del CI
+  probado en un venv limpio con `requirements-dev.txt` y sin `.env`.
+- Morning brief local real: 71.7 KB; la linea mostro las 4 fuentes BCCh (no
+  hay credenciales locales), como se esperaba.
+- Prueba simulada: un feed caido 3 corridas seguidas genera exactamente un
+  aviso.
+- Entorno local: `mise exec python@3.11 -- python -m venv .venv &&
+  .venv/bin/pip install -r requirements-dev.txt`.
 
 ## Proximos pasos sugeridos
 
-1. En el servidor: `pip install -r requirements.txt`,
-   `python -m scripts.diagnose_market_data` (esperado: OK 17/17) y una
-   corrida con credenciales BCCh para ver USD/PEN y Desempleo en la tabla.
-2. Probar la lectura de Nix con `AI_ENABLED=true AI_DRY_RUN=false`.
-3. Integrar la rama (merge a `main` y push: los hace el usuario).
-4. Resto en `NEXT_STEPS.md`: IPSA oficial, `^TNX` en pb, GET condicional,
-   monitor mas liviano, region por fuente para notas chilenas, extra `dev`.
+1. Revisar la rama, merge a `main` y push (usuario). El CI corre en ese push.
+2. En el servidor: rebuild, configurar `OPS_EMAIL_TO`, y tras la segunda
+   corrida mirar `docker compose exec dmac-market-brief-agent python -m app.main health`.
+3. Calibrar umbrales tras un par de semanas (ver `NEXT_STEPS.md`).
+4. Siguiente eje estrategico propuesto: relevancia para el lector chileno
+   (region por fuente para notas de La Tercera/DF).

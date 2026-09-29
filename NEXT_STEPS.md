@@ -51,8 +51,9 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
    conviene mostrar el cambio en pb.
 4. **Rate limit.** yfinance 1.7 no lanza excepcion por ticker fallido en un
    batch (solo lo registra en su log), asi que el cliente no distingue "sin
-   datos" de "bloqueado". Si reaparecen bloqueos, revisar los logs de
-   `yfinance` y considerar cachear la ultima serie buena en SQLite.
+   datos" de "bloqueado". Ahora un bloqueo se ve como activos "caida" en la
+   salud de fuentes (y avisa a mantenedores), y el correo muestra el ultimo
+   precio valido rotulado. Falta cachear la serie (sparkline) buena.
 5. **Rol de la IA en "En foco".** Paso (a) implementado: Nix escribe una
    linea de lectura por grafico, sin elegir activos
    (`services/ai/news_chart_readings.py`). Falta probarlo con Ollama real
@@ -106,7 +107,7 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
 | Paquete | Uso real | Accion |
 |---------|----------|--------|
 | `cachetools` | Nunca importado | Eliminado en 0.14.0 |
-| `pytest`, `ruff` | Solo desarrollo | Mover a un extra `dev` para aligerar la imagen Docker |
+| `pytest`, `ruff` | Solo desarrollo | Movidos a `requirements-dev.txt` / extra `dev` (fuera de la imagen Docker) |
 | `plotly`, `kaleido` | Solo render PNG IA (dormido en el correo MVP) | Mantener mientras exista el render IA; las sparklines no los usan |
 | `pandas` | Import directo solo en tests | Mantener: dependencia de yfinance |
 | `python-dotenv` | No importado | Mantener: `pydantic-settings` lo usa para leer `.env` |
@@ -118,7 +119,30 @@ ningun lado. Los pins `lxml==5.3.0` y `pydantic==2.9.2` no compilan en
 Python 3.14 (Docker usa 3.11, asi que produccion no se ve afectada, pero si
 un entorno local nuevo).
 
-## CI/CD (pendiente de la version anterior)
+## CI/CD
 
-- GitHub Actions con `pytest` y `ruff check` en cada push.
-- `ruff check .` pasa limpio.
+- Hecho: GitHub Actions (`.github/workflows/ci.yml`) corre `ruff check` y
+  `pytest` con Python 3.11 en cada push y PR. Se activa con el primer push
+  que incluya el archivo.
+- Pendiente: proteger `main` en GitHub para exigir CI verde antes del merge.
+
+---
+
+## Salud de fuentes: estado y pendientes
+
+Implementado (ver `CHANGELOG.md`, "Unreleased"): chequeo por corrida,
+histeresis de dos corridas, tablas `source_health`/`source_state`, comando
+`python -m app.main health`, aviso a `OPS_EMAIL_TO`, ultimo dato valido
+rotulado "al DD-MM" y linea "Sin datos en esta edicion" en el correo.
+
+1. **Configurar `OPS_EMAIL_TO`** en el `.env` del servidor (vacio = solo log).
+2. **Calibrar umbrales** tras un par de semanas mirando `health`: frescura
+   por feed (`NEWS_FRESHNESS_HOURS`) y salto maximo de precio (25%).
+3. **Fines de semana.** El monitor (si esta activo) corre tambien de noche y
+   fines de semana; un feed que no publica el domingo podria quedar
+   "degradada" el lunes temprano. Si pasa, sumar el feed al diccionario de
+   frescura o evaluar solo en dias habiles.
+4. **Errores reales por fuente.** Hoy la salud se deduce de lo que llego (0
+   notas = caida); el mensaje de error queda en el log. Si hace falta, los
+   clientes podrian reportar el error a la salud directamente.
+5. **Resumen semanal** opcional a mantenedores aunque no haya cambios.

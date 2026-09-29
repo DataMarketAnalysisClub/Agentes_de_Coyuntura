@@ -2,6 +2,30 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Agregado (salud de fuentes)
+- `services/source_health.py`: evalua cada corrida contra lo esperado. Un
+  feed sin notas o un activo sin precio queda "caida"; un feed cuya nota mas
+  reciente supera su umbral (48 h; 7 dias para Fed y BCE) o un precio que
+  salta mas de 25% contra el ultimo guardado queda "degradada". Con
+  histeresis: dos corridas malas seguidas para cambiar de estado, una buena
+  para volver a ok.
+- Tablas `source_health` (por corrida, 30 dias de retencion) y
+  `source_state` (estado vigente). Comando `python -m app.main health`.
+- Aviso a mantenedores (`OPS_EMAIL_TO`, vacio = solo log): un correo por
+  corrida con cambios de estado. `EmailSender.send` acepta `recipients`
+  para que estos avisos nunca lleguen a la lista del club.
+- Correo: si un activo no trae precio hoy, se muestra su ultimo dato valido
+  (hasta 5 dias) rotulado "al DD-MM", sin variacion ni sparkline. Solo para
+  mostrar: la IA, el sentimiento y el puntaje de impacto usan los datos de
+  hoy, y el respaldo no se persiste. Una linea discreta lista las fuentes
+  sin datos en la edicion.
+- CI en GitHub Actions (`.github/workflows/ci.yml`): `ruff check` y
+  `pytest` con Python 3.11 en cada push y PR.
+
+### Cambiado (paquetes)
+- `pytest` y `ruff` pasan a `requirements-dev.txt` (y al extra `dev` de
+  `pyproject.toml`): la imagen Docker ya no los instala.
+
 ### Agregado
 - Diario Financiero como segunda fuente chilena (`ChileNewsClient._fetch_df`):
   RSS de portada filtrado por seccion (Mercados, Economia y Politica,
