@@ -2,6 +2,17 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Corregido (modo oscuro y telefonos)
+- En Outlook nuevo/web el modo oscuro convertia el marfil en cafe grisaceo
+  con texto de bajo contraste, y el logo oscuro desaparecia. El correo
+  declara `color-scheme: light dark` y trae su propia paleta oscura
+  (`@media (prefers-color-scheme: dark)` y `[data-ogsc]/[data-ogsb]` de
+  Outlook), en bloques `<style>` separados para que Gmail no descarte la
+  media query de telefonos. `apply_dark_mode_classes` asigna las clases segun
+  el color inline de cada elemento. Logo sobre recuadro blanco.
+- Textos chicos de 11/12 px suben a 12/13 px; la fuente y el periodo de cada
+  activo van en su propia linea bajo el nombre (se cortaban en telefonos).
+
 ### Agregado (series del Banco Central)
 - Dolar observado, UF y cobre BML como series diarias del BCCh con ~1 mes
   de historia, junto a los precios de Yahoo (no los reemplazan).

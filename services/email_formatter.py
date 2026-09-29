@@ -214,7 +214,7 @@ def section_eyebrow(title: str, strong_rule: bool = False) -> str:
     """Rotulo de seccion: mayusculas pequenas en azul sobre una linea fina."""
     rule = DMAC_INK if strong_rule else DMAC_RULE
     return (
-        f"<div style=\"font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;"
+        f"<div style=\"font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;"
         f" color: {DMAC_BRAND_PRIMARY}; font-weight: 700; padding-bottom: 6px;"
         f" border-bottom: 1px solid {rule}; margin: 0 0 12px 0;\">{escape(title)}</div>"
     )
@@ -313,7 +313,7 @@ def render_news_list(
             f"<div style=\"padding: 0 0 12px 0; margin: 0 0 12px 0; border-bottom: 1px solid {DMAC_RULE_SOFT};\">"
             f"<div style=\"font-family: {DMAC_SERIF}; font-size: 17px; line-height: 1.35;"
             f" font-weight: 700; color: {DMAC_INK};\">{title_html}</div>"
-            f"<div style=\"font-size: 12px; color: {DMAC_MUTED}; margin-top: 4px;\">{meta}</div>"
+            f"<div style=\"font-size: 13px; color: {DMAC_MUTED}; margin-top: 4px;\">{meta}</div>"
             "</div>"
         )
     return _section_row(section_eyebrow(title) + "".join(rows))
@@ -336,7 +336,7 @@ def render_market_sentiment_section(sentiment) -> str:
     source_html = f" Fuente: {escape(source)}." if source else ""
     return _section_row(
         f"<div style=\"border-top: 1px solid {DMAC_RULE}; border-bottom: 1px solid {DMAC_RULE}; padding: 10px 0;\">"
-        f"<div style=\"font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: {DMAC_MUTED};"
+        f"<div style=\"font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: {DMAC_MUTED};"
         " font-weight: 700;\">Sentimiento de mercado</div>"
         f"<div style=\"margin-top: 4px; font-size: 15px; color: {DMAC_TEXT};\">"
         f"<strong style=\"color: {color};\">{escape(label)}</strong> &middot; {score}/100</div>"
@@ -359,7 +359,7 @@ def render_unavailable_sources(sources: list[str]) -> str:
     """Linea discreta con las fuentes que no trajeron datos en esta edicion."""
     names = ", ".join(escape(source) for source in dict.fromkeys(sources))
     return _section_row(
-        f"<p style=\"margin: 0; font-size: 12px; color: {DMAC_MUTED};\">"
+        f"<p style=\"margin: 0; font-size: 13px; color: {DMAC_MUTED};\">"
         f"Sin datos en esta edición: {names}.</p>",
         top=16,
     )
@@ -385,7 +385,7 @@ def render_key_figures(snapshots: list[MarketSnapshot]) -> str:
         change_text, change_color = format_snapshot_change(snap)
         cells.append(
             f"<div style=\"padding: 10px 10px 10px 0;\">"
-            f"<div style=\"font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: {DMAC_MUTED};\">"
+            f"<div style=\"font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: {DMAC_MUTED};\">"
             f"{escape(snap.name or snap.symbol)}</div>"
             f"<div style=\"font-family: {DMAC_SERIF}; font-size: 22px; font-weight: 700; color: {DMAC_INK};\">"
             f"{format_snapshot_value(snap)}</div>"
@@ -464,7 +464,7 @@ def render_nix_editorial(email) -> str:
     if cautions:
         text = " ".join(escape(caution) for caution in cautions)
         parts.append(
-            f"<p style=\"margin: 14px 0 0 0; font-size: 12px; line-height: 1.5; color: {DMAC_MUTED};\">"
+            f"<p style=\"margin: 14px 0 0 0; font-size: 13px; line-height: 1.5; color: {DMAC_MUTED};\">"
             f"<strong>Cautela:</strong> {text}</p>"
         )
     return "".join(parts)
@@ -487,10 +487,113 @@ def _nix_analysis_section(
     return _section_row(
         section_eyebrow("Lo esencial · Análisis de Nix (IA)")
         + content
-        + f"<p style=\"margin: 12px 0 0 0; font-size: 12px; color: {DMAC_MUTED};\">"
+        + f"<p style=\"margin: 12px 0 0 0; font-size: 13px; color: {DMAC_MUTED};\">"
         "Redactado por Nix a partir de titulares públicos y precios de mercado."
         " Interpretación preliminar.</p>",
         top=26,
+    )
+
+
+# --- Modo oscuro ------------------------------------------------------------
+
+# Color claro (inline) -> nombre -> colores oscuros por uso. Cada elemento
+# recibe clases segun los colores de su estilo inline (ver
+# `apply_dark_mode_classes`), asi los modulos siguen escribiendo solo la
+# paleta clara.
+_DARK_PALETTE: dict[str, tuple[str, dict[str, str]]] = {
+    DMAC_PAGE: ("page", {"bg": "#0e1116"}),
+    DMAC_PAPER: ("paper", {"bg": "#161b22"}),
+    DMAC_BG: ("bgsoft", {"bg": "#1c222b"}),
+    DMAC_INK: ("ink", {"text": "#ebe7de", "border": "#9aa4b4", "bg": "#ebe7de"}),
+    DMAC_BODY_SOFT: ("soft", {"text": "#c5cad3"}),
+    DMAC_MUTED: ("muted", {"text": "#9ba4b3", "bg": "#9ba4b3"}),
+    DMAC_BRAND_PRIMARY: ("accent", {"text": "#8cb3ea", "bg": "#8cb3ea", "border": "#8cb3ea"}),
+    DMAC_RULE: ("rule", {"border": "#343c49"}),
+    DMAC_RULE_SOFT: ("rulesoft", {"border": "#2a303a"}),
+    DMAC_POSITIVE: ("pos", {"text": "#5cc991", "border": "#5cc991"}),
+    DMAC_NEGATIVE: ("neg", {"text": "#ff8b7d", "border": "#ff8b7d"}),
+}
+_KIND_PREFIX = {"text": "dmc", "bg": "dmb", "border": "dmr"}
+_TAG_RE = re.compile(r"<([a-zA-Z][a-zA-Z0-9]*)(\s[^<>]*?)?(/?)>")
+_STYLE_RE = re.compile(r'\sstyle="([^"]*)"')
+_BGCOLOR_RE = re.compile(r'\sbgcolor="(#[0-9a-fA-F]{6})"')
+_CLASS_RE = re.compile(r'\sclass="([^"]*)"')
+_HEX_RE = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+def _declaration_kind(prop: str) -> str | None:
+    prop = prop.strip().lower()
+    if prop == "color":
+        return "text"
+    if prop in {"background", "background-color"}:
+        return "bg"
+    if prop.startswith("border"):
+        return "border"
+    return None
+
+
+def _dark_classes(attrs: str) -> list[str]:
+    classes: list[str] = []
+    style = _STYLE_RE.search(attrs)
+    declarations = style.group(1).split(";") if style else []
+    bgcolor = _BGCOLOR_RE.search(attrs)
+    if bgcolor:
+        declarations.append(f"background: {bgcolor.group(1)}")
+    for declaration in declarations:
+        prop, _, value = declaration.partition(":")
+        kind = _declaration_kind(prop)
+        if kind is None:
+            continue
+        for color in _HEX_RE.findall(value):
+            entry = _DARK_PALETTE.get(color.lower())
+            if entry and kind in entry[1]:
+                name = f"{_KIND_PREFIX[kind]}-{entry[0]}"
+                if name not in classes:
+                    classes.append(name)
+    return classes
+
+
+def apply_dark_mode_classes(html: str) -> str:
+    """Agrega clases de modo oscuro segun los colores inline de cada elemento."""
+
+    def _tag(match: re.Match) -> str:
+        name, attrs, closing = match.group(1), match.group(2) or "", match.group(3)
+        classes = _dark_classes(attrs)
+        if not classes:
+            return match.group(0)
+        existing = _CLASS_RE.search(attrs)
+        if existing:
+            merged = " ".join([existing.group(1), *classes])
+            attrs = attrs[: existing.start()] + f' class="{merged}"' + attrs[existing.end():]
+        else:
+            attrs = f' class="{" ".join(classes)}"' + attrs
+        return f"<{name}{attrs}{closing}>"
+
+    return _TAG_RE.sub(_tag, html)
+
+
+def _dark_mode_styles() -> str:
+    """CSS de modo oscuro para Apple Mail/Outlook (media query) y Outlook web.
+
+    Van en bloques `<style>` separados: Gmail descarta un bloque completo si
+    encuentra un selector que no soporta (como `[data-ogsc]`), y asi no se
+    pierde la media query de telefonos. Gmail no permite controlar su modo
+    oscuro: aplica su propia inversion.
+    """
+    media: list[str] = []
+    outlook: list[str] = []
+    for _, (name, colors) in _DARK_PALETTE.items():
+        for kind, value in colors.items():
+            css_class = f".{_KIND_PREFIX[kind]}-{name}"
+            prop = {"text": "color", "bg": "background-color", "border": "border-color"}[kind]
+            media.append(f"{css_class} {{ {prop}: {value} !important; }}")
+            # Outlook web/nuevo marca con data-ogsc los textos y con data-ogsb
+            # los fondos que ya convirtio; se sobreescriben con la paleta propia.
+            prefix = "[data-ogsb]" if kind == "bg" else "[data-ogsc]"
+            outlook.append(f"{prefix} {css_class} {{ {prop}: {value} !important; }}")
+    return (
+        "<style>@media (prefers-color-scheme: dark) { " + " ".join(media) + " }</style>"
+        "<style>" + " ".join(outlook) + "</style>"
     )
 
 
@@ -521,15 +624,25 @@ def _header_html(
     logo_url: str = "",
     brief_kind: str = "brief",
 ) -> str:
-    logo_img = get_logo_img_tag(logo_path, width=56, url=logo_url)
-    logo_cell = f"<td valign=\"middle\" style=\"width: 56px; padding: 0 14px 0 0;\">{logo_img}</td>" if logo_img else ""
+    logo_img = get_logo_img_tag(logo_path, width=52, url=logo_url)
+    # El logo es oscuro sobre fondo transparente: en modo oscuro desaparecia.
+    # Va sobre un recuadro blanco fijo (bgcolor para Outlook), sin clase de
+    # modo oscuro para que siga blanco.
+    logo_cell = (
+        "<td valign=\"middle\" style=\"padding: 0 14px 0 0;\">"
+        "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"><tr>"
+        f"<td bgcolor=\"#ffffff\" style=\"background: #ffffff; padding: 4px; border-radius: 6px;\">{logo_img}</td>"
+        "</tr></table></td>"
+        if logo_img
+        else ""
+    )
     tag_match = _SUBJECT_TAG_RE.match(subject)
     tag_html = (
         f"<span style=\"color: {DMAC_NEGATIVE}; font-weight: 700;\">{escape(tag_match.group(1))}</span> &middot; "
         if tag_match
         else ""
     )
-    small = f"font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: {DMAC_MUTED};"
+    small = f"font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: {DMAC_MUTED};"
     intro_html = (
         f"<p style=\"margin: 14px 0 0 0; font-size: 14px; line-height: 1.5; color: {DMAC_BODY_SOFT};\">"
         f"{escape(intro)}</p>"
@@ -564,11 +677,11 @@ def _footer_html() -> str:
     return (
         f"<tr><td class=\"dmac-px\" style=\"padding: 20px {_SIDE_PX}px 26px {_SIDE_PX}px;"
         f" border-top: 3px double {DMAC_INK};\">"
-        f"<p style=\"margin: 0; font-size: 12px; color: {DMAC_MUTED}; line-height: 1.55;\">"
+        f"<p style=\"margin: 0; font-size: 13px; color: {DMAC_MUTED}; line-height: 1.55;\">"
         "Reporte generado automáticamente por <strong>DMAC Market Brief Agent</strong>."
         " Los hechos se basan en titulares públicos y precios de mercado al momento del envío."
         " Las interpretaciones son preliminares y no constituyen recomendación de inversión.</p>"
-        f"<p style=\"margin: 10px 0 0 0; font-size: 12px; color: {DMAC_MUTED}; line-height: 1.5;\">"
+        f"<p style=\"margin: 10px 0 0 0; font-size: 13px; color: {DMAC_MUTED}; line-height: 1.5;\">"
         f"<strong style=\"color: {DMAC_TEXT};\">Nix Assistant, DMAC UDD</strong> &middot; Equipo de Datos y Coyuntura"
         f" &middot; &copy; {year} Data Market Analysis Club UDD</p>"
         "</td></tr>"
@@ -667,15 +780,19 @@ def build_email_html(
         f"<p style=\"margin: 0; color: {DMAC_MUTED};\">Sin contenido relevante para esta corrida.</p>"
     )
 
-    return (
+    return apply_dark_mode_classes(
         "<!doctype html><html lang=\"es\"><head>"
         "<meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-        # Diseno claro: evita que Apple Mail/Outlook inviertan colores a medias.
-        "<meta name=\"color-scheme\" content=\"light\">"
-        "<meta name=\"supported-color-schemes\" content=\"light\">"
+        # Modo oscuro propio (ver _dark_mode_styles): sin esto, Outlook y
+        # Apple Mail convierten los colores por su cuenta y el marfil quedaba
+        # cafe grisaceo con texto de bajo contraste.
+        "<meta name=\"color-scheme\" content=\"light dark\">"
+        "<meta name=\"supported-color-schemes\" content=\"light dark\">"
         f"<title>{escape(subject)}</title>"
-        f"<style>body, table, td, p, a, li, div {{ font-family: {DMAC_FONT_FAMILY}; }} {_MOBILE_STYLE}</style>"
+        f"<style>:root {{ color-scheme: light dark; }} body, table, td, p, a, li, div {{ font-family: {DMAC_FONT_FAMILY}; }}"
+        f" {_MOBILE_STYLE}</style>"
+        f"{_dark_mode_styles()}"
         "</head>"
         f"<body bgcolor=\"{DMAC_PAGE}\" style=\"margin: 0; padding: 0; background: {DMAC_PAGE};"
         f" font-family: {DMAC_FONT_FAMILY}; color: {DMAC_TEXT};\">"

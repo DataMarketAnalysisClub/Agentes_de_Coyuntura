@@ -240,10 +240,10 @@ def render_news_charts_section(charts: list[NewsChart]) -> str:
             f"<strong style=\"color: {change_color};\">{change_text}</strong></td>"
             "</tr></table>"
             f"<div style=\"margin-top: 6px; border-bottom: 1px solid {DMAC_INK};\">{chart_html}</div>"
-            f"<div style=\"font-size: 12px; color: {DMAC_MUTED}; margin-top: 4px;\">"
+            f"<div style=\"font-size: 13px; color: {DMAC_MUTED}; margin-top: 4px;\">"
             f"{escape(source)}{period_text} &middot; mín. {format_number(low)} / máx. {format_number(high)}</div>"
             f"{reading}"
-            f"<div style=\"font-size: 12px; color: {DMAC_MUTED}; margin-top: 8px;\">Por la noticia:</div>"
+            f"<div style=\"font-size: 13px; color: {DMAC_MUTED}; margin-top: 8px;\">Por la noticia:</div>"
             f"{headlines}"
             "</div>"
         )
@@ -309,7 +309,7 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
     rows: list[str] = []
     for title, members in _group_snapshots(visible):
         rows.append(
-            f"<tr><td colspan=\"4\" style=\"padding: 14px 0 4px 0; font-size: 11px; font-weight: 700;"
+            f"<tr><td colspan=\"4\" style=\"padding: 14px 0 4px 0; font-size: 12px; font-weight: 700;"
             f" color: {DMAC_MUTED}; text-transform: uppercase; letter-spacing: 1px;\">{escape(title)}</td></tr>"
         )
         for snap in members:
@@ -323,9 +323,11 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
                 # Ultimo dato valido (la fuente no trajo datos hoy): se rotula
                 # con su fecha para no presentarlo como precio actual.
                 notes.append(as_of)
+            # En linea propia bajo el nombre: junto a el se cortaba en 2-3
+            # lineas en telefonos de 320-390 px.
             note_html = (
-                f" <span style=\"font-weight: 400; font-size: 11px; color: {DMAC_MUTED};\">"
-                f"{escape(' · '.join(notes))}</span>"
+                f"<div style=\"font-weight: 400; font-size: 12px; color: {DMAC_MUTED};\">"
+                f"{escape(' · '.join(notes))}</div>"
                 if notes
                 else ""
             )
@@ -344,7 +346,7 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
             )
 
     header_style = (
-        f"padding: 0 0 6px 0; font-size: 11px; color: {DMAC_MUTED}; font-weight: 700;"
+        f"padding: 0 0 6px 0; font-size: 12px; color: {DMAC_MUTED}; font-weight: 700;"
         f" text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid {DMAC_INK};"
     )
     header = (
@@ -356,7 +358,7 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
         "</tr>"
     )
     footnote = (
-        f"<div style=\"margin-top: 8px; font-size: 12px; color: {DMAC_MUTED};\">"
+        f"<div style=\"margin-top: 8px; font-size: 13px; color: {DMAC_MUTED};\">"
         "Fuente: Yahoo Finance salvo indicación (BCCh: Banco Central de Chile)."
         " Tasas en % con su variación en puntos base (pb); indicadores con su período"
         " y cambio en puntos porcentuales (pp) contra el dato anterior."

@@ -182,7 +182,7 @@ def test_assets_table_renders_sparkline_when_history_available() -> None:
     assert "1 mes" in html
     # Yahoo va en la nota al pie; solo otras fuentes se rotulan en la fila.
     assert "USDCLP" not in html
-    assert "TPM Chile <span" in html and ">BCCh</span>" in html
+    assert "TPM Chile<div" in html and ">BCCh</div>" in html
     assert "Fuente: Yahoo Finance salvo indicación" in html
     # TPM es una tasa: con "%" y sin "s/d" como variacion.
     assert "4,75%" in html
@@ -331,3 +331,35 @@ def test_indicators_show_period_and_change_in_points_with_neutral_color() -> Non
     html = render_assets_table([ipc12, tpm, uf])
     assert "BCCh · ago-26" in html
     assert "BCCh · 29-09" in html
+
+
+def test_dark_mode_classes_follow_inline_colors() -> None:
+    from services.email_formatter import (
+        DMAC_INK,
+        DMAC_PAPER,
+        DMAC_POSITIVE,
+        apply_dark_mode_classes,
+    )
+
+    html = apply_dark_mode_classes(
+        f'<td bgcolor="{DMAC_PAPER}" style="color: {DMAC_INK};">x</td>'
+        f'<td class="dmac-px" style="border-bottom:12px solid {DMAC_POSITIVE}"></td>'
+        '<td style="color: #123456;">y</td>'
+    )
+
+    assert 'class="dmc-ink dmb-paper"' in html
+    assert 'class="dmac-px dmr-pos"' in html
+    assert '<td style="color: #123456;">' in html  # colores fuera de la paleta: sin clase
+
+
+def test_email_declares_dark_mode_and_keeps_logo_on_white() -> None:
+    html = build_email_html("Asunto", "", logo_url="https://example.com/logo.png")
+
+    assert '<meta name="color-scheme" content="light dark">' in html
+    assert "@media (prefers-color-scheme: dark)" in html
+    assert "[data-ogsc] .dmc-ink" in html
+    # La media query de telefonos va en otro bloque: Gmail descarta un <style>
+    # completo si trae selectores como [data-ogsc].
+    mobile_block = html.split("<style>")[1]
+    assert "max-width: 480px" in mobile_block and "data-ogsc" not in mobile_block
+    assert '<td bgcolor="#ffffff"' in html
