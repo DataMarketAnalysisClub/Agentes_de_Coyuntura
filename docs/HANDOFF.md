@@ -2,7 +2,10 @@
 
 Estado completo para retomar el trabajo en otra sesion. Detalle de cambios
 en `CHANGELOG.md` ("Unreleased") y backlog tecnico en `NEXT_STEPS.md`.
-Claude tiene prohibido hacer push: el merge y el push los hace el usuario.
+Claude no hace commits ni push (desde el 2026-09-29): deja los cambios sin
+commitear y entrega los commits propuestos; el usuario los hace junto al push.
+Como `scripts/deploy.sh` despliega solo codigo commiteado, antes de desplegar
+cambios nuevos el usuario debe commitearlos.
 
 ## Estado de ramas y produccion (lo primero a revisar)
 
