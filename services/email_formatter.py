@@ -28,6 +28,9 @@ DMAC_POSITIVE = "#16a34a"
 DMAC_NEGATIVE = "#dc2626"
 DMAC_NEUTRAL = "#6b7280"
 DMAC_LINK = "#1d4ed8"
+# Sin esto, Outlook de escritorio (motor Word) usa Times New Roman por
+# defecto porque ningun estilo del archivo fijaba font-family explicitamente.
+DMAC_FONT_FAMILY = "Arial, Helvetica, sans-serif"
 
 
 @dataclass(frozen=True)
@@ -265,10 +268,16 @@ def render_market_sentiment_section(sentiment) -> str:
         " letter-spacing: 0.02em; text-transform: uppercase;\">Sentimiento de mercado</h2>"
         f"<div style=\"background: {DMAC_CARD}; border: 1px solid {DMAC_BORDER};"
         " border-radius: 8px; padding: 14px 14px 12px 14px;\">"
-        f"<div style=\"display: flex; align-items: baseline; justify-content: space-between; gap: 12px;\">"
-        f"<div style=\"font-size: 18px; font-weight: 700; color: {color};\">{escape(label)}</div>"
-        f"<div style=\"font-size: 13px; font-weight: 700; color: {DMAC_TEXT};\">{score}/100</div>"
-        "</div>"
+        # Tabla en vez de flexbox: Outlook de escritorio (motor Word) no
+        # soporta `display: flex` y colapsaba esta fila.
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">"
+        "<tr>"
+        f"<td align=\"left\" style=\"font-size: 18px; font-weight: 700; color: {color};\">"
+        f"{escape(label)}</td>"
+        f"<td align=\"right\" style=\"font-size: 13px; font-weight: 700; color: {DMAC_TEXT};"
+        " white-space: nowrap;\">"
+        f"{score}/100</td>"
+        "</tr></table>"
         f"<div style=\"margin: 10px 0 8px 0; height: 10px; background: {DMAC_BG};"
         " border-radius: 999px; overflow: hidden;\">"
         f"<div style=\"width: {score}%; height: 10px; background: {color}; border-radius: 999px;\"></div>"
@@ -298,7 +307,11 @@ def _header_html(subject: str, intro: str, logo_path: str = "") -> str:
         "Data Market Analysis Club UDD</div>"
     )
     return (
-        "<tr><td style=\"background: linear-gradient(135deg, "
+        # bgcolor (atributo HTML, no CSS) es el fallback que Outlook de
+        # escritorio SI respeta cuando ignora el gradient de la propiedad
+        # `background`. Sin esto, el texto blanco del header queda sobre un
+        # fondo blanco/transparente y se ve "invisible" en Outlook desktop.
+        f"<tr><td bgcolor=\"{DMAC_BRAND_PRIMARY_DARK}\" style=\"background: linear-gradient(135deg, "
         f"{DMAC_BRAND_PRIMARY} 0%, {DMAC_BRAND_PRIMARY_DARK} 100%);"
         " padding: 28px 24px;\">"
         f"{logo_html}"
@@ -421,14 +434,19 @@ def build_email_html(
     return (
         "<!doctype html><html lang=\"es\"><head>"
         "<meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
         f"<title>{escape(subject)}</title>"
-        "</head><body style=\"margin: 0; padding: 0; background: " + DMAC_BG + ";\">"
+        f"<style>body, table, td, p, a, li, h1, h2, h3 {{ font-family: {DMAC_FONT_FAMILY}; }}</style>"
+        "</head><body style=\"margin: 0; padding: 0; background: " + DMAC_BG + ";"
+        " font-family: " + DMAC_FONT_FAMILY + ";\">"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
-        " style=\"width: 100%; background: " + DMAC_BG + ";\"><tr><td align=\"center\""
+        " style=\"width: 100%; background: " + DMAC_BG + "; font-family: " + DMAC_FONT_FAMILY + ";\">"
+        "<tr><td align=\"center\""
         " style=\"padding: 24px 12px;\">"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
         " style=\"width: 100%; max-width: 640px; background: " + DMAC_CARD + ";"
-        " border: 1px solid " + DMAC_BORDER + "; border-radius: 8px; overflow: hidden;\">"
+        " border: 1px solid " + DMAC_BORDER + "; border-radius: 8px; overflow: hidden;"
+        " font-family: " + DMAC_FONT_FAMILY + ";\">"
         f"{_header_html(subject, intro_text, logo_path=logo_path)}"
         f"{body_html}"
         f"{_footer_html()}"
@@ -468,7 +486,7 @@ def _nix_analysis_section(
         f" border: 1px solid {DMAC_BRAND_PRIMARY};"
         f" border-left: 6px solid {DMAC_BRAND_PRIMARY};"
         " border-radius: 8px; overflow: hidden;\">"
-        "<tr><td style=\"background: linear-gradient(135deg,"
+        f"<tr><td bgcolor=\"{DMAC_BRAND_PRIMARY_DARK}\" style=\"background: linear-gradient(135deg,"
         f" {DMAC_BRAND_PRIMARY} 0%, {DMAC_BRAND_PRIMARY_DARK} 100%);"
         " padding: 16px 18px;\">"
         "<div style=\"display: inline-block; padding: 3px 9px; background:"
