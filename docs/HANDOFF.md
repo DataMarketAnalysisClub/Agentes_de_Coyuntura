@@ -29,12 +29,14 @@ corre produccion.
   `ssh-agent -a /run/user/1000/ssh-claude.sock -t 8h` y
   `SSH_AUTH_SOCK=/run/user/1000/ssh-claude.sock ssh-add ~/.ssh/id_ed25519`.
 - `.env` de produccion: `EMAIL_ENABLED=true`, `DRY_RUN=false`, IA activa,
-  `OPS_EMAIL_TO=brcarom@udd.cl`, monitor de alto impacto apagado. Las
+  `EMAIL_TO=dmac@udd.cl` y `OPS_EMAIL_TO=dmac@udd.cl` (desde el
+  2026-09-29; antes brcarom@udd.cl, respaldo del `.env` en
+  `~/backups/env-20260929-182440.bak`), monitor de alto impacto apagado. Las
   series nuevas del BCCh usan los defaults de `app/config.py` (no hace falta
   agregarlas al `.env`).
   **Nunca correr `app.main morning/close` como prueba: envia a la lista.**
 - Correo de prueba: replicar el job con `EmailSender.send(...,
-  recipients=["brcarom@udd.cl"])`, sin `BriefRepository().save` ni
+  recipients=["dmac@udd.cl"])`, sin `BriefRepository().save` ni
   `save_mentions`, ejecutando el script dentro del contenedor:
   `ssh bruno@nixbox "cd /opt/dmac-market-brief-agent && docker compose exec -T dmac-market-brief-agent python -" < script.py`.
 - Respaldos: `~/backups/dmac-20260929-114708.tgz` (antes del correo
@@ -85,7 +87,11 @@ corre produccion.
 - Seleccion "En foco" deterministica; la IA solo redacta la linea.
 - USD/PEN y desempleo desde el BCCh. DF como segunda fuente chilena (sin
   Opinion).
-- `OPS_EMAIL_TO=brcarom@udd.cl`. Linea al lector con fuentes sin datos: si.
+- Destinatario del brief y de los avisos de operacion: `dmac@udd.cl`
+  (`EMAIL_TO` y `OPS_EMAIL_TO`, cambio pedido por el usuario el 2026-09-29).
+  Tras editar el `.env` de produccion: respaldarlo antes y recrear el
+  contenedor (`docker compose up -d --force-recreate`) para que lo lea.
+- Linea al lector con fuentes sin datos: si.
   Ultimo dato valido rotulado con fecha: si; la IA nunca lo recibe.
 - Cupo chileno 1 de 3 y filtro de comunicados administrativos: si.
 - Graficos del correo en HTML/CSS (sin imagenes); logo por URL.
