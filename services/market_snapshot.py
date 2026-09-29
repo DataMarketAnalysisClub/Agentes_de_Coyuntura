@@ -5,7 +5,7 @@ from typing import Protocol
 
 from app.config import get_settings
 from data_sources.bcentral_client import BCentralClient
-from data_sources.yfinance_client import Quote, YFinanceClient
+from data_sources.yfinance_client import DEFAULT_ASSETS, Quote, YFinanceClient
 from storage.models import MarketSnapshot
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 BCENTRAL_FX_SERIES: tuple[tuple[str, str, str], ...] = (
     ("USDPEN", "USD/PEN", "bcentral_usdpen_series"),
 )
+
+
+MACRO_INDICATOR_SYMBOLS: tuple[str, ...] = ("TPM", "IPC", "DESEMPLEO")
+
+
+def expected_market_symbols() -> list[str]:
+    """Simbolos que cada corrida deberia traer (para la salud de fuentes)."""
+    return [
+        *(asset.symbol for asset in DEFAULT_ASSETS),
+        *(symbol for symbol, _, _ in BCENTRAL_FX_SERIES),
+        *MACRO_INDICATOR_SYMBOLS,
+    ]
 
 
 class MarketQuoteClient(Protocol):

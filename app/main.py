@@ -30,6 +30,7 @@ def main() -> None:
             "ai-review",
             "ai-review-fast",
             "ai-review-compare",
+            "health",
         ],
     )
     args = parser.parse_args()
@@ -55,6 +56,11 @@ def main() -> None:
         run_ai_review_fast()
     elif args.command == "ai-review-compare":
         run_ai_review_compare()
+    elif args.command == "health":
+        from services.source_health_report import format_health_table
+        from storage.repositories import SourceHealthRepository
+
+        print(format_health_table(SourceHealthRepository().states()))
     else:
         logger.error("Unknown command", extra={"command": args.command})
 

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from storage.database import get_connection
@@ -23,6 +24,20 @@ class MarketSnapshotRepository:
                     for item in snapshots
                 ],
             )
+
+
+    def last_valid_prices(self, since: datetime) -> dict[str, tuple[float, datetime]]:
+        """Ultimo precio no nulo por simbolo desde `since`, con su timestamp."""
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT symbol, price, timestamp FROM market_snapshots
+                WHERE price IS NOT NULL AND timestamp >= ?
+                ORDER BY timestamp
+                """,
+                (_iso(since),),
+            ).fetchall()
+        return {row["symbol"]: (row["price"], datetime.fromisoformat(row["timestamp"])) for row in rows}
 
 
 class NewsRepository:
@@ -157,3 +172,81 @@ class SentEmailRepository:
                 """,
                 (_iso(email.timestamp), email.subject, email.recipients, email.status, email.error_message),
             )
+
+
+@dataclass(frozen=True)
+class SourceState:
+    source: str
+    kind: str
+    state: str
+    last_status: str
+    since: datetime
+    last_ok_at: datetime | None
+    detail: str
+
+
+class SourceHealthRepository:
+    """Registros de salud por corrida y estado reportado vigente por fuente."""
+
+    def states(self) -> dict[str, SourceState]:
+        with get_connection() as connection:
+            rows = connection.execute("SELECT * FROM source_state ORDER BY kind, source").fetchall()
+        return {
+            row["source"]: SourceState(
+                source=row["source"],
+                kind=row["kind"],
+                state=row["state"],
+                last_status=row["last_status"],
+                since=datetime.fromisoformat(row["since"]),
+                last_ok_at=datetime.fromisoformat(row["last_ok_at"]) if row["last_ok_at"] else None,
+                detail=row["detail"] or "",
+            )
+            for row in rows
+        }
+
+    def save_run(self, run_at: datetime, checks: list, states: list[SourceState]) -> None:
+        with get_connection() as connection:
+            connection.executemany(
+                """
+                INSERT INTO source_health (run_at, source, kind, status, items, newest_at, detail)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        _iso(run_at),
+                        check.source,
+                        str(check.kind),
+                        str(check.status),
+                        check.items,
+                        _iso(check.newest_at) if check.newest_at else None,
+                        check.detail,
+                    )
+                    for check in checks
+                ],
+            )
+            connection.executemany(
+                """
+                INSERT INTO source_state (source, kind, state, last_status, since, last_ok_at, detail)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source) DO UPDATE SET
+                    kind = excluded.kind, state = excluded.state, last_status = excluded.last_status,
+                    since = excluded.since, last_ok_at = excluded.last_ok_at, detail = excluded.detail
+                """,
+                [
+                    (
+                        state.source,
+                        state.kind,
+                        state.state,
+                        state.last_status,
+                        _iso(state.since),
+                        _iso(state.last_ok_at) if state.last_ok_at else None,
+                        state.detail,
+                    )
+                    for state in states
+                ],
+            )
+
+    def prune(self, before: datetime) -> int:
+        with get_connection() as connection:
+            cursor = connection.execute("DELETE FROM source_health WHERE run_at < ?", (_iso(before),))
+        return cursor.rowcount

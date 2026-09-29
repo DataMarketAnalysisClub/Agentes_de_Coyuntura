@@ -33,6 +33,9 @@ DF_MAX_ITEMS = 20
 class ChileNewsClient:
     """Scraping client for Chilean news sources."""
 
+    # Nombres con los que cada fuente etiqueta sus notas (salud de fuentes).
+    SOURCE_NAMES: tuple[str, ...] = ("La Tercera Pulso", "Diario Financiero")
+
     def __init__(self, http_client: ResilientHttpClient | None = None) -> None:
         self._http_client = http_client
 

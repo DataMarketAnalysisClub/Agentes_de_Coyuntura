@@ -1,15 +1,18 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from app.config import Settings, get_settings
 from data_sources.chile_news_client import ChileNewsClient
-from data_sources.rss_news_client import RssNewsClient
+from data_sources.rss_news_client import RawNewsItem, RssNewsClient
 from services.impact_scoring import with_impact_scores
-from services.market_snapshot import MarketSnapshotService
+from services.market_snapshot import MarketSnapshotService, expected_market_symbols
 from services.news_classifier import classify_news
+from services.source_health import SourceCheck, check_market_snapshots, check_news_sources
+from services.source_health_report import record_health
 from storage.database import init_db
 from storage.models import MarketSnapshot, NewsItem
 from storage.repositories import MarketSnapshotRepository, NewsRepository
@@ -22,7 +25,23 @@ def chile_now(settings: Settings | None = None) -> datetime:
     return datetime.now(ZoneInfo(current_settings.tz))
 
 
+# Ventana para buscar el ultimo precio guardado (salud de fuentes).
+PREVIOUS_PRICE_LOOKBACK_DAYS = 10
+
+
+@dataclass(frozen=True)
+class CollectionResult:
+    snapshots: list[MarketSnapshot]
+    news: list[NewsItem]
+    health: list[SourceCheck] = field(default_factory=list)
+
+
 def collect_market_and_news(news_hours: int) -> tuple[list[MarketSnapshot], list[NewsItem]]:
+    result = collect_market_and_news_with_health(news_hours)
+    return result.snapshots, result.news
+
+
+def collect_market_and_news_with_health(news_hours: int) -> CollectionResult:
     init_db()
 
     logger.info("Starting data collection", extra={"news_hours": news_hours})
@@ -31,9 +50,10 @@ def collect_market_and_news(news_hours: int) -> tuple[list[MarketSnapshot], list
     # independientes entre si: corrian en serie antes, lo que sumaba su
     # latencia. En paralelo, el tiempo total queda acotado por la mas lenta
     # de las tres en vez de la suma.
+    rss_client = RssNewsClient()
     with ThreadPoolExecutor(max_workers=3) as executor:
         snapshots_future = executor.submit(MarketSnapshotService().collect)
-        rss_future = executor.submit(RssNewsClient().fetch_latest)
+        rss_future = executor.submit(rss_client.fetch_latest)
         chile_future = executor.submit(ChileNewsClient().fetch_latest)
 
         snapshots = snapshots_future.result()
@@ -45,9 +65,12 @@ def collect_market_and_news(news_hours: int) -> tuple[list[MarketSnapshot], list
         chile_news = chile_future.result()
         logger.info("Chile news collected", extra={"count": len(chile_news)})
 
+    raw_news = rss_news + chile_news
+    expected_sources = [feed.source for feed in rss_client.configured_feeds()] + list(ChileNewsClient.SOURCE_NAMES)
+    # Antes de guardar: los precios previos son la referencia de plausibilidad.
+    health = _evaluate_health(raw_news, expected_sources, snapshots)
     MarketSnapshotRepository().save_many(snapshots)
 
-    raw_news = rss_news + chile_news
     logger.info("Total raw news items", extra={"count": len(raw_news)})
 
     # Filtrar por recencia ANTES de deduplicar: la deduplicacion es O(n^2)
@@ -73,7 +96,26 @@ def collect_market_and_news(news_hours: int) -> tuple[list[MarketSnapshot], list
         extra={"total": len(scored), "high_impact": len(high_impact)},
     )
 
-    return snapshots, scored
+    return CollectionResult(snapshots, scored, health)
+
+
+def _evaluate_health(
+    raw_news: list[RawNewsItem],
+    expected_sources: list[str],
+    snapshots: list[MarketSnapshot],
+) -> list[SourceCheck]:
+    """Evalua y registra la salud de fuentes; nunca interrumpe el brief."""
+    now = datetime.now(UTC)
+    try:
+        previous = MarketSnapshotRepository().last_valid_prices(now - timedelta(days=PREVIOUS_PRICE_LOOKBACK_DAYS))
+        checks = check_news_sources(raw_news, expected_sources, now) + check_market_snapshots(
+            snapshots, expected_market_symbols(), {symbol: price for symbol, (price, _) in previous.items()}
+        )
+        record_health(checks, now)
+    except Exception:
+        logger.warning("Source health evaluation failed", exc_info=True)
+        return []
+    return checks
 
 
 def write_output_bundle(

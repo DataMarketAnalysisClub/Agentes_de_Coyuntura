@@ -75,6 +75,31 @@ def init_db(settings: Settings | None = None) -> None:
                 sent INTEGER NOT NULL DEFAULT 0
             );
 
+            -- Salud de fuentes (services/source_health.py): un registro por
+            -- fuente y corrida, y el estado reportado vigente por fuente.
+            CREATE TABLE IF NOT EXISTS source_health (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_at TEXT NOT NULL,
+                source TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                status TEXT NOT NULL,
+                items INTEGER NOT NULL DEFAULT 0,
+                newest_at TEXT,
+                detail TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_source_health_run_at ON source_health (run_at);
+
+            CREATE TABLE IF NOT EXISTS source_state (
+                source TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                state TEXT NOT NULL,
+                last_status TEXT NOT NULL,
+                since TEXT NOT NULL,
+                last_ok_at TEXT,
+                detail TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS sent_emails (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
