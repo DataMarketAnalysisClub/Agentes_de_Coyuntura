@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     bcentral_credentials_file: str = ""
     bcentral_tpm_series: str = "F022.TPM.TIN.D001.NO.Z.D"
     bcentral_ipc_series: str = "F074.IPC.VAR.Z.Z.C.M"
+    bcentral_unemployment_series: str = "F049.DES.TAS.INE9.10.M"
+    bcentral_usdpen_series: str = "F072.PEN.USD.N.O.D"
     bcentral_timeout_seconds: float = 20.0
 
     market_data_provider: str = "yfinance"

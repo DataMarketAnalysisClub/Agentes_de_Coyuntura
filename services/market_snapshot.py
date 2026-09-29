@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -8,6 +9,13 @@ from data_sources.yfinance_client import Quote, YFinanceClient
 from storage.models import MarketSnapshot
 
 logger = logging.getLogger(__name__)
+
+# Tipos de cambio que se toman del BCCh en vez de Yahoo: (simbolo, nombre,
+# atributo de Settings con el codigo de serie). USD/PEN salio de yfinance
+# porque PEN=X traia velas inconsistentes (sep-2026).
+BCENTRAL_FX_SERIES: tuple[tuple[str, str, str], ...] = (
+    ("USDPEN", "USD/PEN", "bcentral_usdpen_series"),
+)
 
 
 class MarketQuoteClient(Protocol):
@@ -33,30 +41,36 @@ class MarketSnapshotService:
 
     def collect(self) -> list[MarketSnapshot]:
         timestamp = datetime.now(UTC)
-        snapshots: list[MarketSnapshot] = []
 
-        try:
-            quotes = self.market_client.fetch_quotes()
-        except Exception:
-            logger.warning("Market data provider failed", exc_info=True)
-            quotes = []
+        # yfinance y el BCCh son servicios independientes: se consultan en
+        # paralelo y el tiempo total queda acotado por el mas lento.
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            fx_future = executor.submit(self._collect_bcentral_fx)
+            macro_future = executor.submit(self._collect_bcentral_indicators, timestamp)
+            try:
+                quotes = self.market_client.fetch_quotes()
+            except Exception:
+                logger.warning("Market data provider failed", exc_info=True)
+                quotes = []
+            # El fallback se evalua solo con yfinance: un tipo de cambio del
+            # BCCh no debe ocultar que el proveedor principal no trajo datos.
+            quotes = self._with_fallback_quotes(quotes)
+            quotes = _merge_quotes(quotes, fx_future.result())
+            macro = macro_future.result()
 
-        quotes = self._with_fallback_quotes(quotes)
-
-        for quote in quotes:
-            snapshots.append(
-                MarketSnapshot(
-                    timestamp=timestamp,
-                    symbol=quote.symbol,
-                    name=quote.name,
-                    price=quote.price,
-                    change_pct=quote.change_pct,
-                    source=quote.source,
-                    history=quote.history,
-                )
+        snapshots = [
+            MarketSnapshot(
+                timestamp=timestamp,
+                symbol=quote.symbol,
+                name=quote.name,
+                price=quote.price,
+                change_pct=quote.change_pct,
+                source=quote.source,
+                history=quote.history,
             )
-
-        snapshots.extend(self._collect_bcentral_placeholders(timestamp))
+            for quote in quotes
+        ]
+        snapshots.extend(macro)
         return snapshots
 
     def _with_fallback_quotes(self, quotes: list[Quote]) -> list[Quote]:
@@ -88,20 +102,49 @@ class MarketSnapshotService:
                 merged[idx] = fallback_quote
         return merged
 
-    def _collect_bcentral_placeholders(self, timestamp: datetime) -> list[MarketSnapshot]:
-        items: list[MarketSnapshot] = []
-        try:
-            tpm = self.bcentral_client.fetch_policy_rate()
-            items.append(MarketSnapshot(timestamp, "TPM", "TPM Chile", tpm, None, "bcentral"))
-        except Exception:
-            logger.warning("Failed to fetch TPM placeholder", exc_info=True)
+    def _collect_bcentral_fx(self) -> list[Quote]:
+        settings = getattr(self.bcentral_client, "settings", None) or get_settings()
+        quotes: list[Quote] = []
+        for symbol, name, setting in BCENTRAL_FX_SERIES:
+            try:
+                quote = self.bcentral_client.fetch_fx_quote(getattr(settings, setting), symbol, name)
+            except Exception:
+                logger.warning("Failed to fetch BCentral FX series", extra={"symbol": symbol}, exc_info=True)
+                continue
+            if quote is not None:
+                quotes.append(quote)
+        return quotes
 
-        try:
-            inflation = self.bcentral_client.fetch_inflation()
-            items.append(MarketSnapshot(timestamp, "IPC", "IPC / Inflacion Chile", inflation, None, "bcentral"))
-        except Exception:
-            logger.warning("Failed to fetch inflation placeholder", exc_info=True)
+    def _collect_bcentral_indicators(self, timestamp: datetime) -> list[MarketSnapshot]:
+        indicators = (
+            ("TPM", "TPM Chile", self.bcentral_client.fetch_policy_rate),
+            ("IPC", "IPC / Inflacion Chile", self.bcentral_client.fetch_inflation),
+            ("DESEMPLEO", "Desempleo Chile", self.bcentral_client.fetch_unemployment),
+        )
+        with ThreadPoolExecutor(max_workers=len(indicators)) as executor:
+            futures = [(symbol, name, executor.submit(fetch)) for symbol, name, fetch in indicators]
+        items: list[MarketSnapshot] = []
+        for symbol, name, future in futures:
+            try:
+                value = future.result()
+            except Exception:
+                logger.warning("Failed to fetch BCentral indicator", extra={"symbol": symbol}, exc_info=True)
+                continue
+            items.append(MarketSnapshot(timestamp, symbol, name, value, None, "bcentral"))
         return items
+
+
+def _merge_quotes(quotes: list[Quote], extra: list[Quote]) -> list[Quote]:
+    """Agrega `extra` reemplazando cotizaciones sin datos del mismo simbolo."""
+    merged = list(quotes)
+    by_symbol = {quote.symbol: idx for idx, quote in enumerate(merged)}
+    for quote in extra:
+        idx = by_symbol.get(quote.symbol)
+        if idx is None:
+            merged.append(quote)
+        elif merged[idx].price is None:
+            merged[idx] = quote
+    return merged
 
 
 class NoopMarketClient:

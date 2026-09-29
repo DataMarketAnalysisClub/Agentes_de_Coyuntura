@@ -58,7 +58,7 @@ def generate_morning_brief(
         _section("2. Sentimiento de mercado", _sentiment_lines(market_sentiment)),
         _section(
             "3. Pulso de apertura",
-            _select_symbols(snapshots, ("USDCLP", "COPPER", "IPSA", "TPM", "IPC"))
+            _select_symbols(snapshots, ("USDCLP", "COPPER", "IPSA", "TPM", "IPC", "DESEMPLEO"))
             + _select_symbols(snapshots, ("SP500", "NASDAQ100", "US10Y", "DXY", "GOLD", "WTI")),
         ),
         _section(

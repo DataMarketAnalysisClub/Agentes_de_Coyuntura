@@ -73,7 +73,8 @@ DEFAULT_ASSETS: tuple[MarketAsset, ...] = (
     MarketAsset("USDBRL", "USD/BRL", "BRL=X"),
     MarketAsset("USDMXN", "USD/MXN", "MXN=X"),
     MarketAsset("USDCOP", "USD/COP", "COP=X"),
-    MarketAsset("USDPEN", "USD/PEN", "PEN=X"),
+    # USD/PEN se toma del BCCh (services/market_snapshot.py): PEN=X, USDPEN=X
+    # y PENUSD=X traian velas inconsistentes en Yahoo (sep-2026).
 )
 
 
