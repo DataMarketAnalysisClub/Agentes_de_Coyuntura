@@ -1,4 +1,4 @@
-# Handoff: sesion 2026-09-29 (cierre de la tarde)
+# Handoff: sesion 2026-09-29 (tarde, segunda parte)
 
 Estado completo para retomar el trabajo en otra sesion. Detalle de cambios
 en `CHANGELOG.md` ("Unreleased") y backlog tecnico en `NEXT_STEPS.md`.
@@ -8,17 +8,13 @@ Claude tiene prohibido hacer push: el merge y el push los hace el usuario.
 
 | Donde | Commit | Contenido |
 |---|---|---|
-| `origin/main` (y `main` local) | `925bddc` | Todo hasta relevancia chilena (salud de fuentes, CI, cupo Chile) |
-| `chore/deploy-script` (local, sin push) | `457cef7` | `scripts/deploy.sh` + `DEPLOY.md` corregido |
-| `fix/email-crossplatform` (local, sin push) | rama sobre `chore/deploy-script` | Correo multiplataforma (logo por URL, movil, sin rgba) + este handoff |
-| **Produccion (`nixbox`)** | `163d8dc` (`DEPLOYED_COMMIT`) | = `fix/email-crossplatform` antes de este handoff |
+| `origin/main` | `239704e` | Brent (contrato vigente), diseno Editorial, series BCCh, decision IPSA |
+| `main` local | ver `git log` | + modo oscuro, textos mas grandes en telefono y este handoff (sin push) |
+| **Produccion (`nixbox`)** | ver `DEPLOYED_COMMIT` en el servidor | Se despliega `main` local con `scripts/deploy.sh` |
 
-**Produccion corre codigo que aun no esta en `origin/main`.** Integrar con
-un solo fast-forward (incluye el script de deploy):
-
-```bash
-git checkout main && git merge --ff-only fix/email-crossplatform && git push origin main
-```
+Comprobar con `git log --oneline origin/main..main` que falta pushear y con
+`ssh bruno@nixbox cat /opt/dmac-market-brief-agent/DEPLOYED_COMMIT` que
+corre produccion.
 
 ## Servidor de produccion
 
@@ -26,50 +22,62 @@ git checkout main && git merge --ff-only fix/email-crossplatform && git push ori
   (Docker Compose). **No es repo git**: `git pull` ahi no hace nada.
 - Desplegar SIEMPRE con `scripts/deploy.sh` (simulacion) y
   `scripts/deploy.sh --apply` (respaldo en `~/backups`, rsync seguro,
-  rebuild, verificacion). `DEPLOY_REF=<rama>` para desplegar otra rama.
-- Acceso de Claude: llave `~/.ssh/id_ed25519` (con passphrase) autorizada en
-  el servidor. En cada sesion el usuario la desbloquea en un agente temporal:
+  rebuild, verificacion). `DEPLOY_REF=<rama|commit>` para otra referencia.
+  El usuario autorizo a Claude a desplegar (2026-09-29).
+- Acceso de Claude: llave `~/.ssh/id_ed25519` (con passphrase). En cada
+  sesion el usuario la desbloquea en un agente temporal:
   `ssh-agent -a /run/user/1000/ssh-claude.sock -t 8h` y
   `SSH_AUTH_SOCK=/run/user/1000/ssh-claude.sock ssh-add ~/.ssh/id_ed25519`.
-- `.env` de produccion: `EMAIL_ENABLED=true`, `DRY_RUN=false`, IA activa
-  (`AI_ENABLED`, `AI_BRIEF_ENABLED`, `AI_DRY_RUN=false`),
-  `OPS_EMAIL_TO=brcarom@udd.cl`, monitor de alto impacto apagado.
+- `.env` de produccion: `EMAIL_ENABLED=true`, `DRY_RUN=false`, IA activa,
+  `OPS_EMAIL_TO=brcarom@udd.cl`, monitor de alto impacto apagado. Las
+  series nuevas del BCCh usan los defaults de `app/config.py` (no hace falta
+  agregarlas al `.env`).
   **Nunca correr `app.main morning/close` como prueba: envia a la lista.**
-  Para probar, enviar a un solo destinatario con
-  `EmailSender.send(..., recipients=[...])` sin guardar menciones (asi se
-  hizo el correo "[PRUEBA]" del 2026-09-29 11:50).
-- Respaldos en el servidor: `~/backups/dmac-20260929-pre-v0.14.tgz` (codigo
-  de junio) y `~/backups/dmac-20260929-114708.tgz`.
+- Correo de prueba: replicar el job con `EmailSender.send(...,
+  recipients=["brcarom@udd.cl"])`, sin `BriefRepository().save` ni
+  `save_mentions`, ejecutando el script dentro del contenedor:
+  `ssh bruno@nixbox "cd /opt/dmac-market-brief-agent && docker compose exec -T dmac-market-brief-agent python -" < script.py`.
+- Respaldos: `~/backups/dmac-20260929-114708.tgz` (antes del correo
+  multiplataforma) y `~/backups/dmac-20260929-144512.tgz` (antes de `239704e`).
 
-## Que se hizo hoy (2026-09-29)
+## Entorno local
 
-1. **Manana**: clasificador con limites de palabra; Diario Financiero;
-   BCCh desempleo y USD/PEN; lectura de Nix por grafico "En foco".
-2. **Salud de fuentes**: chequeo por corrida con histeresis, tablas
-   `source_health`/`source_state`, `python -m app.main health`, aviso a
-   `OPS_EMAIL_TO`, ultimo dato valido rotulado "al DD-MM", linea "Sin datos
-   en esta edicion", CI en GitHub Actions, `requirements-dev.txt`.
-3. **Relevancia chilena**: cupo 1 de 3 para Chile (solo si pasa calidad),
-   region por defecto "Chile" en medios chilenos (salvo DF Internacional),
-   filtro de comunicados administrativos de la Fed/BCE, DF con tier 2.
-4. **Despliegue**: produccion corria el codigo de **junio** (0.1.0, yfinance
-   0.2.48). Se desplego todo; incidente de ~2 min por excluir `storage/`
-   completo en el rsync (tiene codigo), sin envios perdidos. Nacio
-   `scripts/deploy.sh` y se corrigio el rsync de `DEPLOY.md`, que habria
-   borrado `.env` y credenciales.
-5. **Correo multiplataforma** (el usuario mostro el logo roto en Outlook PC):
-   logo por URL HTTPS sobre recuadro blanco (Gmail/Outlook web no muestran
-   `data:`), tabla de activos sin scroll horizontal desde ~340 px (antes
-   minimo 436 px), sin `rgba()`, 72 -> 47 KB.
+- `.env` local (copiado de `.env.example`, permisos 600, ignorado por git)
+  con credenciales del BCCh **solo en esta maquina**; `DRY_RUN=true`,
+  `EMAIL_ENABLED=false`, IA apagada. Nunca imprimir su contenido.
+- Los tests ignoran el `.env` (fixture en `tests/conftest.py`).
+- `mise exec python@3.11 -- python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`;
+  `.venv/bin/python -m pytest -q` (332 tests) y `.venv/bin/ruff check .`.
 
-## Verificado en produccion
+## Que se hizo hoy (2026-09-29, tarde)
 
-- yfinance 1.7.0: 17/17. BCCh: TPM 4.5, IPC 0.6, desempleo 9.53, USD/PEN
-  3.44 con 22 dias. DF 17 y La Tercera 20 notas. 28/28 fuentes ok.
-- Correo "[PRUEBA]" enviado solo a brcarom@udd.cl: Nix OK, 3 lecturas de
-  "En foco" con lenguaje prudente, 1 titular chileno, 57.9 KB.
-- Local: 321 tests, `ruff` limpio; capturas Chromium en 1200 px, 360 px
-  (iframe; Chromium headless no baja de 500 px de ventana) y modo oscuro.
+1. **Brent -8%**: era el cambio de contrato de `BZ=F` (nov -> dic). El
+   cliente de yfinance ahora usa el contrato vigente (`underlyingSymbol`)
+   para todos los futuros `=F`; si Yahoo no responde, usa el continuo.
+2. **Diseno "Editorial"** (propuesta A del canvas de Claude Design
+   https://claude.ai/artifact/8FwBUAh8u3RYssbvkPodVJ): cabecera tipo
+   periodico, "Lo esencial" de Nix (Chile primero), cifras clave, mercados
+   agrupados, "En foco" en 2 columnas. Columnas fluidas que se apilan sin
+   `@media` y tabla `<!--[if mso]>` para Outlook de escritorio. Formato
+   chileno de numeros, Treasury en pb, tildes. `render_nix_editorial`
+   reemplaza el HTML de Nix duplicado en los jobs.
+3. **Modo oscuro propio**: `color-scheme: light dark`, paleta oscura via
+   `@media (prefers-color-scheme: dark)` y `[data-ogsc]/[data-ogsb]`
+   (Outlook web/nuevo). `apply_dark_mode_classes` agrega clases segun el
+   color inline de cada elemento: los modulos solo escriben la paleta clara
+   (si se agrega un color nuevo, sumarlo a `_DARK_PALETTE`). Logo sobre
+   recuadro blanco. Textos de 11/12 px subieron a 12/13 px.
+4. **BCCh**: dolar observado, UF y cobre BML (diarias, con historia); IPC 12
+   meses e IMACEC; TPM/IPC/IMACEC/desempleo con periodo y cambio en pp.
+   Codigos verificados con `SearchSeries` y documentados en el README.
+5. **IPSA**: se evaluaron fuentes (README); el usuario aprobo `MXIPSAGC.SN`.
+
+## Verificado
+
+- Produccion con `239704e`: 17/17 yfinance, todas las series BCCh con dato,
+  Brent -1,07%, correo "[PRUEBA]" enviado a brcarom@udd.cl (68 KB).
+- Local: capturas Chromium claro/oscuro en 1200, 390 y 320 px. Con modo
+  oscuro y clases el correo pesa ~82 KB (limite de recorte de Gmail ~102 KB).
 
 ## Decisiones del usuario (no re-discutir sin motivo)
 
@@ -80,40 +88,33 @@ git checkout main && git merge --ff-only fix/email-crossplatform && git push ori
   Ultimo dato valido rotulado con fecha: si; la IA nunca lo recibe.
 - Cupo chileno 1 de 3 y filtro de comunicados administrativos: si.
 - Graficos del correo en HTML/CSS (sin imagenes); logo por URL.
+- Diseno "Editorial" (propuesta A) aprobado; debe ser responsivo.
+- USD/CLP de Yahoo en la tabla + dolar observado del BCCh como referencia.
 - IPSA desde yfinance con `MXIPSAGC.SN` (aprobado 2026-09-29). No buscar
   otra fuente salvo que Yahoo deje de publicarlo.
 
 ## Trabajo pendiente (en orden sugerido)
 
-1. **Integrar ramas** (usuario): fast-forward de arriba y push. El CI corre
-   por primera vez en ese push; revisar la pestana Actions.
-2. **Revisar el correo "[PRUEBA]"** en Outlook PC (con y sin "Mostrar
-   contenido bloqueado"), Outlook/Gmail en telefono y Gmail web. Ajustar lo
-   que se vea mal; Chromium no reproduce los motores de Outlook/Gmail.
-3. **Revisar el cierre de las 18:30 del 2026-09-29** (primer envio real con
+1. **Revisar el modo oscuro y el telefono en clientes reales** (Outlook
+   nuevo/web, Outlook y Gmail en el celular). Gmail no permite controlar su
+   modo oscuro: aplica su propia inversion.
+2. **Revisar el cierre de las 18:30 del 2026-09-29** (primer envio real con
    todo lo nuevo): `docker compose logs --since 1h dmac-market-brief-agent`
    y `python -m app.main health` en el servidor.
-4. **Brent -8.46% en el dia con +6.5% en el mes** (29-09): probable cambio
-   de contrato de `BZ=F` a fin de mes en Yahoo. Investigar; si se confirma,
-   evaluar marcar o suavizar la variacion en dias de roll (tambien `CL=F`,
-   `HG=F`, `GC=F`). La salud de fuentes no lo detecta (umbral 25%).
-5. **Router de temas IA intermitente**: respuesta vacia para "Estados
-   Unidos" (`Strict JSON parse failed ... char 0`); el pipeline sigue sin ese
-   bloque. Ver reintento o `AI_STRICT_JSON`.
-6. **Calidad de noticias** (`services/news_quality.py`): `HIGH_SIGNAL_TERMS`
-   y `LOW_VALUE_PATTERNS` aun por substring e incluyen el nombre de la fuente
-   ("federal reserve" siempre es alta senal). `impact_scoring` suma +1 a
-   Latam/EE.UU./Global pero no a Chile (confirmar si es intencional).
+3. **Peso del correo**: ~82 KB. Si Nix trae mas texto puede acercarse a
+   ~102 KB (Gmail recorta). Opcion: clases de modo oscuro en la tabla de la
+   sparkline en vez de en cada celda.
+4. **Router de temas IA intermitente**: respuesta vacia para "Estados
+   Unidos" (`Strict JSON parse failed ... char 0`). Ver reintento o
+   `AI_STRICT_JSON`.
+5. **Calidad de noticias** (`services/news_quality.py`): `HIGH_SIGNAL_TERMS`
+   y `LOW_VALUE_PATTERNS` por substring e incluyen el nombre de la fuente.
+   `impact_scoring` suma +1 a Latam/EE.UU./Global pero no a Chile.
+   La nota de DF del dolar quedo como region "EE.UU." en un envio anterior.
+6. **Nix**: viñetas con prefijos gramaticalmente rotos ("Posible que...",
+   "Preliminar que...") y hechos copiados en ingles; hoy se ocultan las
+   viñetas si hay parrafos, pero conviene corregir el prompt.
 7. **Salud de fuentes**: calibrar umbrales tras ~2 semanas mirando `health`.
-8. **Correo**: 320 px aun desborda ~22 px; simbolo redundante bajo el nombre
-   ("IPSA / IPSA"); considerar `color-scheme` para modo oscuro.
-9. Backlog de `NEXT_STEPS.md`:
-   GET condicional, monitor mas liviano, deduplicacion O(n^2), paso (b) de
-   IA en "En foco", proteger `main` exigiendo CI verde.
-
-## Entorno local
-
-`mise exec python@3.11 -- python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`
-y `.venv/bin/python -m pytest -q`. Preview del correo sin enviar: ver
-`collect_market_and_news_with_health` + `build_email_html` (no hay `.env`
-local: sin credenciales BCCh, esas 4 fuentes salen "sin datos").
+8. Backlog de `NEXT_STEPS.md`: GET condicional, monitor mas liviano,
+   deduplicacion O(n^2), paso (b) de IA en "En foco", proteger `main`
+   exigiendo CI verde.
