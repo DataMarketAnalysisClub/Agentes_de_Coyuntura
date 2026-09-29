@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
+import pytest
 
 from data_sources.yfinance_client import (
     DEFAULT_ASSETS,
@@ -194,3 +195,64 @@ def test_default_ipsa_uses_hourly_bolsa_santiago_ticker() -> None:
     ipsa = next(a for a in DEFAULT_ASSETS if a.symbol == "IPSA")
     assert ipsa.yf_ticker == "MXIPSAGC.SN"
     assert ipsa.interval == "1h"
+
+
+def test_continuous_future_uses_front_contract(monkeypatch) -> None:
+    # Brent 29-09-2026: el continuo empalmo nov (105.28) con dic (96.84) y
+    # mostraba -8%; el contrato de dic cayo ~1%.
+    import data_sources.yfinance_client as module
+
+    brent = "BZ" + "=F"
+    monkeypatch.setattr(module, "_front_contract_symbol", lambda ticker: "BZZ26.NYM" if ticker == brent else None)
+    requested: list[list[str]] = []
+
+    def fake_download(**kwargs):
+        requested.append(kwargs["tickers"])
+        return _batch({"BZZ26.NYM": _ohlc_frame([97.83, 96.84]), "^GSPC": _ohlc_frame([100.0, 101.0])})
+
+    _patch_download(monkeypatch, fake_download)
+
+    quotes = YFinanceClient().fetch_quotes((
+        MarketAsset("BRENT", "Brent", brent),
+        MarketAsset("SP500", "S&P 500", "^GSPC"),
+    ))
+
+    assert requested == [["BZZ26.NYM", "^GSPC"]]
+    assert quotes[0].symbol == "BRENT"
+    assert quotes[0].price == 96.84
+    assert round(quotes[0].change_pct or 0, 2) == -1.01
+    assert quotes[1].price == 101.0
+
+
+def test_continuous_future_falls_back_when_contract_unknown(monkeypatch) -> None:
+    gold = "GC" + "=F"
+    _patch_download(monkeypatch, lambda **kwargs: _batch({gold: _ohlc_frame([4000.0, 4040.0])}))
+
+    quotes = YFinanceClient().fetch_quotes((MarketAsset("GOLD", "Oro", gold),))
+
+    assert quotes[0].price == 4040.0
+
+
+@pytest.mark.allow_front_contract_lookup
+def test_front_contract_symbol_validates_root(monkeypatch) -> None:
+    import data_sources.yfinance_client as module
+
+    infos = {
+        "BZ=F": {"underlyingSymbol": "BZZ26.NYM"},
+        "CL=F": {"underlyingSymbol": "BZZ26.NYM"},  # otra raiz: se ignora
+        "GC=F": {},
+    }
+
+    class FakeTicker:
+        def __init__(self, ticker):
+            if ticker not in infos:
+                raise RuntimeError("Yahoo caido")
+            self.info = infos[ticker]
+
+    monkeypatch.setattr(module.yf, "Ticker", FakeTicker)
+
+    assert module._front_contract_symbol("BZ=F") == "BZZ26.NYM"
+    assert module._front_contract_symbol("CL=F") is None
+    assert module._front_contract_symbol("GC=F") is None
+    assert module._front_contract_symbol("NG=F") is None
+    assert module._front_contract_symbol("^GSPC") is None

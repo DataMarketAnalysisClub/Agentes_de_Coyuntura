@@ -2,6 +2,15 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Corregido (cambio de contrato en futuros)
+- Los futuros continuos de Yahoo (`BZ=F`, `CL=F`, cobre, `GC=F`) empalman
+  el contrato siguiente sin ajustar al vencer el vigente: el 29-09 el Brent
+  mostro -8,09% (nov 105,28 -> dic 96,84) cuando el contrato de diciembre
+  cayo ~1%, y Nix interpreto esa caida. El cliente ahora resuelve el
+  contrato vigente (`underlyingSymbol`, ej. `BZZ26.NYM`) y calcula precio,
+  variacion e historia del mes sobre ese solo contrato. Si Yahoo no responde,
+  usa el continuo como antes y registra un warning.
+
 ### Corregido (correo multiplataforma)
 - Logo roto en Gmail y Outlook web/nuevo: ahora se referencia por HTTPS
   (`EMAIL_LOGO_URL`) en vez de `data:` URI, sobre un recuadro blanco (el PNG

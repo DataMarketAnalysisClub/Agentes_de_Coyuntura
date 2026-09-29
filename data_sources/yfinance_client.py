@@ -1,7 +1,9 @@
 import logging
 import random
+import re
 import time
-from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
 import pandas as pd
@@ -29,6 +31,12 @@ STALE_AFTER_DAYS = 7
 # completa se descarta por inconsistente (ej. PEN=X en sep-2026: 16/23 velas).
 MAX_INCONSISTENT_BAR_RATIO = 0.25
 _OHLC_TOLERANCE = 1e-4
+# Futuros continuos de Yahoo ("<raiz>=F"). Al vencer el contrato, Yahoo
+# empalma el siguiente sin ajustar: la "variacion diaria" del dia del cambio
+# compara dos contratos distintos (Brent 29-09-2026: -8% aparente, -1% real).
+# Por eso se descarga el contrato vigente (ej. BZZ26.NYM) y la variacion y el
+# grafico del mes quedan sobre un solo contrato.
+_CONTINUOUS_FUTURE = re.compile(r"^([A-Z0-9]+)=F$")
 
 
 @dataclass(frozen=True)
@@ -110,6 +118,7 @@ class YFinanceClient:
         if not assets:
             return []
 
+        assets = self._with_front_contracts(assets)
         by_interval: dict[str, list[MarketAsset]] = {}
         for asset in assets:
             by_interval.setdefault(asset.interval, []).append(asset)
@@ -119,6 +128,34 @@ class YFinanceClient:
             for quote in self._fetch_group(tuple(group), interval):
                 quotes_by_symbol[quote.symbol] = quote
         return [quotes_by_symbol[asset.symbol] for asset in assets]
+
+    def _with_front_contracts(self, assets: tuple[MarketAsset, ...]) -> tuple[MarketAsset, ...]:
+        """Reemplaza cada futuro continuo por su contrato vigente, si se conoce."""
+        futures = [asset for asset in assets if _CONTINUOUS_FUTURE.match(asset.yf_ticker)]
+        if not futures:
+            return assets
+        with ThreadPoolExecutor(max_workers=len(futures)) as executor:
+            contracts = dict(
+                zip(
+                    (asset.yf_ticker for asset in futures),
+                    executor.map(lambda asset: _front_contract_symbol(asset.yf_ticker), futures),
+                    strict=True,
+                )
+            )
+        resolved = []
+        for asset in assets:
+            contract = contracts.get(asset.yf_ticker)
+            if contract:
+                resolved.append(replace(asset, yf_ticker=contract))
+            else:
+                if asset.yf_ticker in contracts:
+                    logger.warning(
+                        "Contrato vigente no disponible; se usa el futuro continuo "
+                        "(la variacion puede incluir un cambio de contrato)",
+                        extra={"symbol": asset.symbol, "ticker": asset.yf_ticker},
+                    )
+                resolved.append(asset)
+        return tuple(resolved)
 
     def _fetch_group(self, assets: tuple[MarketAsset, ...], interval: str) -> list[Quote]:
         tickers = [a.yf_ticker for a in assets]
@@ -231,6 +268,26 @@ class YFinanceClient:
             change_pct = ((price - previous) / previous) * 100
         series = tuple(float(value) for value in closes.iloc[-HISTORY_POINTS:])
         return Quote(asset.symbol, asset.name, price, change_pct, history=series)
+
+
+def _front_contract_symbol(ticker: str) -> str | None:
+    """Contrato que Yahoo usa hoy para un futuro continuo (ej. BZZ26.NYM).
+
+    Devuelve None si Yahoo no responde o el simbolo no corresponde a la
+    misma raiz: en ese caso se sigue usando el continuo.
+    """
+    match = _CONTINUOUS_FUTURE.match(ticker)
+    if not match:
+        return None
+    try:
+        info = yf.Ticker(ticker).info or {}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo resolver el contrato vigente", extra=_error_extra(exc, ticker=ticker))
+        return None
+    contract = str(info.get("underlyingSymbol") or "").strip()
+    if not contract or not contract.startswith(match.group(1)) or contract == ticker:
+        return None
+    return contract
 
 
 def _extract_ticker_frame(history, ticker: str):

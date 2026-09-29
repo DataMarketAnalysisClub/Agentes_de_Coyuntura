@@ -52,3 +52,25 @@ def _disable_ollama_calls(request):
     finally:
         for p in patches:
             p.stop()
+
+
+@pytest.fixture(autouse=True)
+def _no_front_contract_lookup(request, monkeypatch):
+    """Los tests no consultan a Yahoo por el contrato vigente de los futuros.
+
+    Sin contrato resuelto el cliente usa el ticker continuo, como antes.
+    Los tests que prueban la resolucion se marcan con
+    @pytest.mark.allow_front_contract_lookup.
+    """
+    if "allow_front_contract_lookup" in request.keywords:
+        return
+    import data_sources.yfinance_client as module
+
+    monkeypatch.setattr(module, "_front_contract_symbol", lambda ticker: None)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "allow_ollama_calls: permite usar el cliente Ollama real en el test")
+    config.addinivalue_line(
+        "markers", "allow_front_contract_lookup: no parchea la resolucion del contrato vigente de futuros"
+    )
