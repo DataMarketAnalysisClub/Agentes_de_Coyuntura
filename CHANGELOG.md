@@ -2,6 +2,18 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Corregido (correo multiplataforma)
+- Logo roto en Gmail y Outlook web/nuevo: ahora se referencia por HTTPS
+  (`EMAIL_LOGO_URL`) en vez de `data:` URI, sobre un recuadro blanco (el PNG
+  es oscuro y se perdia en el azul del header), con texto alternativo "DMAC".
+  El correo baja ~26 KB (72 -> 47 KB).
+- Scroll horizontal en telefonos: la tabla de activos fijaba un ancho minimo
+  de ~436 px. Padding 8 px, sparkline de 48 px, precios >= 10.000 sin
+  decimales y "yfinance" en una nota al pie (solo se repite la fuente cuando
+  es otra). Sin scroll desde ~340 px; media query para margenes en <= 480 px.
+- `rgba()` reemplazado por hex en el header y el bloque de Nix (Outlook de
+  escritorio lo ignora); subtitulo del header con mas contraste.
+
 ### Cambiado (relevancia para el lector chileno)
 - Cupo chileno en los titulares principales (`select_executive_news`,
   `guaranteed_region="Chile"`): si ninguno de los 3 es de Chile y hay una

@@ -12,8 +12,8 @@ El email es un multipart/alternative con dos partes:
 2. `text/html`: version con branding DMAC, generada por
    `services.email_formatter.build_email_html`
 
-Tamano tipico del HTML: 70-90 KB con sparklines (sin imagenes IA embebidas
-en MVP). Gmail recorta el mensaje sobre ~102 KB.
+Tamano tipico del HTML: ~45-55 KB con sparklines (sin imagenes IA
+embebidas en MVP; el logo va por URL). Gmail recorta el mensaje sobre ~102 KB.
 
 ## Orden de secciones en el HTML
 
@@ -65,8 +65,22 @@ en `build_email_html` cuando hay IA.
 | Outlook mobile (Android/iOS) | OK, todo se ve |
 | Gmail web | OK (no probado con IA real, fallback OK) |
 | Apple Mail | Deberia funcionar (no probado) |
-| Telefonos angostos (<= 375 px) | La tabla de activos (4 columnas) no cabe y obliga a scroll horizontal; ya pasaba antes de las sparklines. Desde ~390 px cabe |
+| Telefonos | Sin scroll horizontal desde ~340 px (medido en 390/360 px). Una media query (`max-width: 480px`) reduce margenes donde se soporta (Apple Mail, Gmail app, Outlook mobile); sin ella igual cabe |
+| Outlook nuevo / web con remitente externo | Bloquea imagenes hasta "Mostrar contenido bloqueado": el logo muestra su texto alternativo "DMAC". El resto del correo no usa imagenes |
 | Clientes antiguos (Outlook 2016, Lotus Notes) | Las barras estaticas funcionan; el badge DMAC AI puede no verse con gradient |
+
+### Reglas de compatibilidad (no romper)
+
+- **Logo por URL HTTPS** (`EMAIL_LOGO_URL`, por defecto el PNG del repo en
+  GitHub), nunca `data:`: Gmail no muestra imagenes `data:` y Outlook
+  web/nuevo las bloquea (el logo salia como "DMAC Logo" roto, 2026-09-29).
+  Va sobre un recuadro blanco porque el PNG es oscuro y transparente.
+- **Sin `rgba()`**: Outlook de escritorio lo ignora. Usar hex
+  (`DMAC_ON_BRAND*` para texto sobre el azul).
+- **Gradientes siempre con `bgcolor`** de respaldo en la celda.
+- **Tabla de activos angosta**: padding 8 px, sparkline de 48 px, precios
+  >= 10.000 sin decimales, fuente solo cuando no es yfinance. Medir en 360 px
+  antes de agregar columnas.
 
 ## Visualizaciones en el email (MVP)
 

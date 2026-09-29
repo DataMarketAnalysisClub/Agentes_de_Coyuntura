@@ -31,6 +31,20 @@ DMAC_LINK = "#1d4ed8"
 # Sin esto, Outlook de escritorio (motor Word) usa Times New Roman por
 # defecto porque ningun estilo del archivo fijaba font-family explicitamente.
 DMAC_FONT_FAMILY = "Arial, Helvetica, sans-serif"
+# Texto claro sobre el azul del header, en hex: Outlook de escritorio ignora
+# rgba() y dejaba ese texto con el color por defecto.
+DMAC_ON_BRAND = "#dbe4f7"
+DMAC_ON_BRAND_ACCENT = "#a5f3fc"
+DMAC_ON_BRAND_BADGE = "#3b5fcf"
+# Media query para telefonos: reduce margenes laterales. Los clientes que la
+# ignoran igual muestran el correo sin scroll horizontal (la tabla de activos
+# cabe desde ~320 px), solo con mas margen.
+_MOBILE_STYLE = (
+    "@media only screen and (max-width: 480px) {"
+    " .dmac-outer { padding: 8px 0 !important; }"
+    " .dmac-px { padding-left: 14px !important; padding-right: 14px !important; }"
+    "}"
+)
 
 
 @dataclass(frozen=True)
@@ -129,7 +143,7 @@ def _render_section_html(block: _Block, links: dict[str, str] | None = None) -> 
             f"<p style=\"margin: 0 0 8px 0; line-height: 1.55;\">{escape(line)}</p>"
             for line in block.bullets
         )
-        return f"<tr><td style=\"padding: 20px 24px 0 24px;\">{body}</td></tr>"
+        return f"<tr><td class=\"dmac-px\" style=\"padding: 20px 24px 0 24px;\">{body}</td></tr>"
 
     if block.title:
         title_html = (
@@ -152,7 +166,7 @@ def _render_section_html(block: _Block, links: dict[str, str] | None = None) -> 
         body_html = ""
 
     return (
-        "<tr><td style=\"padding: 20px 24px 0 24px;\">"
+        "<tr><td class=\"dmac-px\" style=\"padding: 20px 24px 0 24px;\">"
         f"{title_html}{body_html}"
         "</td></tr>"
     )
@@ -222,7 +236,7 @@ def render_news_list(
             "</tr>"
         )
     return (
-        "<tr><td style=\"padding: 20px 24px 0 24px;\">"
+        "<tr><td class=\"dmac-px\" style=\"padding: 20px 24px 0 24px;\">"
         f"<h2 style=\"margin: 0 0 12px 0; font-size: 15px; color: {DMAC_BRAND_PRIMARY_DARK};"
         " letter-spacing: 0.02em; text-transform: uppercase;\">"
         f"{escape(title)}</h2>"
@@ -237,7 +251,7 @@ def render_news_list(
 def render_chart_section(chart_id: str, chart_html: str) -> str:
     """Wrap a Plotly chart fragment in a styled card for the email."""
     return (
-        "<tr><td style=\"padding: 20px 24px 0 24px;\">"
+        "<tr><td class=\"dmac-px\" style=\"padding: 20px 24px 0 24px;\">"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
         f" style=\"width: 100%; background: {DMAC_CARD}; border: 1px solid {DMAC_BORDER};"
         " border-radius: 6px; overflow: hidden;\">"
@@ -263,7 +277,7 @@ def render_market_sentiment_section(sentiment) -> str:
         driver_html = "<li style=\"margin: 0 0 4px 0;\">Sin drivers dominantes.</li>"
 
     return (
-        "<tr><td style=\"padding: 20px 24px 0 24px;\">"
+        "<tr><td class=\"dmac-px\" style=\"padding: 20px 24px 0 24px;\">"
         f"<h2 style=\"margin: 0 0 12px 0; font-size: 15px; color: {DMAC_BRAND_PRIMARY_DARK};"
         " letter-spacing: 0.02em; text-transform: uppercase;\">Sentimiento de mercado</h2>"
         f"<div style=\"background: {DMAC_CARD}; border: 1px solid {DMAC_BORDER};"
@@ -299,10 +313,20 @@ def _sentiment_color(score: int) -> str:
     return DMAC_NEUTRAL
 
 
-def _header_html(subject: str, intro: str, logo_path: str = "") -> str:
-    logo_html = get_logo_img_tag(logo_path, width=48)
+def _header_html(subject: str, intro: str, logo_path: str = "", logo_url: str = "") -> str:
+    logo_img = get_logo_img_tag(logo_path, width=48, url=logo_url)
+    # El logo es oscuro sobre fondo transparente: sobre el azul del header no
+    # se veia. Va en un recuadro blanco (bgcolor para Outlook de escritorio).
+    logo_html = (
+        "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
+        " style=\"margin: 0 0 12px 0;\"><tr>"
+        "<td bgcolor=\"#ffffff\" style=\"background: #ffffff; padding: 6px; border-radius: 6px;\">"
+        f"{logo_img}</td></tr></table>"
+        if logo_img
+        else ""
+    )
     subtitle = (
-        f"<div style=\"font-size: 12px; color: {DMAC_BRAND_ACCENT}; margin-top: 4px;"
+        f"<div style=\"font-size: 12px; color: {DMAC_ON_BRAND_ACCENT}; margin-top: 4px;"
         " letter-spacing: 0.06em; text-transform: uppercase;\">"
         "Data Market Analysis Club UDD</div>"
     )
@@ -311,16 +335,16 @@ def _header_html(subject: str, intro: str, logo_path: str = "") -> str:
         # escritorio SI respeta cuando ignora el gradient de la propiedad
         # `background`. Sin esto, el texto blanco del header queda sobre un
         # fondo blanco/transparente y se ve "invisible" en Outlook desktop.
-        f"<tr><td bgcolor=\"{DMAC_BRAND_PRIMARY_DARK}\" style=\"background: linear-gradient(135deg, "
+        f"<tr><td class=\"dmac-px\" bgcolor=\"{DMAC_BRAND_PRIMARY_DARK}\" style=\"background: linear-gradient(135deg, "
         f"{DMAC_BRAND_PRIMARY} 0%, {DMAC_BRAND_PRIMARY_DARK} 100%);"
         " padding: 28px 24px;\">"
         f"{logo_html}"
-        "<div style=\"font-size: 11px; color: rgba(255,255,255,0.85);"
+        f"<div style=\"font-size: 11px; color: {DMAC_ON_BRAND};"
         " letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600;\">DMAC Brief</div>"
         f"<h1 style=\"margin: 6px 0 0 0; font-size: 22px; color: #ffffff; font-weight: 700;\">"
         f"{escape(subject)}</h1>"
         f"{subtitle}"
-        f"<p style=\"margin: 14px 0 0 0; color: rgba(255,255,255,0.92); font-size: 13px;"
+        f"<p style=\"margin: 14px 0 0 0; color: {DMAC_ON_BRAND}; font-size: 13px;"
         f" line-height: 1.55;\">{escape(intro)}</p>"
         "</td></tr>"
     )
@@ -330,7 +354,7 @@ def render_unavailable_sources(sources: list[str]) -> str:
     """Linea discreta con las fuentes que no trajeron datos en esta edicion."""
     names = ", ".join(escape(source) for source in dict.fromkeys(sources))
     return (
-        "<tr><td style=\"padding: 16px 24px 0 24px;\">"
+        "<tr><td class=\"dmac-px\" style=\"padding: 16px 24px 0 24px;\">"
         f"<p style=\"margin: 0; font-size: 11px; color: {DMAC_MUTED};\">"
         f"Sin datos en esta edicion: {names}.</p></td></tr>"
     )
@@ -338,7 +362,7 @@ def render_unavailable_sources(sources: list[str]) -> str:
 
 def _footer_html() -> str:
     return (
-        "<tr><td style=\"padding: 24px; border-top: 1px solid "
+        "<tr><td class=\"dmac-px\" style=\"padding: 24px; border-top: 1px solid "
         f"{DMAC_BORDER}; background: {DMAC_BG};\">"
         "<p style=\"margin: 0; font-size: 11px; color: "
         f"{DMAC_MUTED}; line-height: 1.55;\">"
@@ -375,6 +399,7 @@ def build_email_html(
     brief_kind: str = "brief",
     news_link_map: dict[str, str] | None = None,
     logo_path: str = "",
+    logo_url: str = "",
     include_charts: bool = True,
     nix_analysis_html: str | None = None,
     nix_chart_pngs: dict[str, bytes] | None = None,
@@ -466,18 +491,18 @@ def build_email_html(
         "<meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
         f"<title>{escape(subject)}</title>"
-        f"<style>body, table, td, p, a, li, h1, h2, h3 {{ font-family: {DMAC_FONT_FAMILY}; }}</style>"
+        f"<style>body, table, td, p, a, li, h1, h2, h3 {{ font-family: {DMAC_FONT_FAMILY}; }} {_MOBILE_STYLE}</style>"
         "</head><body style=\"margin: 0; padding: 0; background: " + DMAC_BG + ";"
         " font-family: " + DMAC_FONT_FAMILY + ";\">"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
         " style=\"width: 100%; background: " + DMAC_BG + "; font-family: " + DMAC_FONT_FAMILY + ";\">"
         "<tr><td align=\"center\""
-        " style=\"padding: 24px 12px;\">"
+        " class=\"dmac-outer\" style=\"padding: 24px 12px;\">"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
         " style=\"width: 100%; max-width: 640px; background: " + DMAC_CARD + ";"
         " border: 1px solid " + DMAC_BORDER + "; border-radius: 8px; overflow: hidden;"
         " font-family: " + DMAC_FONT_FAMILY + ";\">"
-        f"{_header_html(subject, intro_text, logo_path=logo_path)}"
+        f"{_header_html(subject, intro_text, logo_path=logo_path, logo_url=logo_url)}"
         f"{body_html}"
         f"{_footer_html()}"
         "</table></td></tr></table></body></html>"
@@ -510,7 +535,7 @@ def _nix_analysis_section(
     nix_content: str = html if html.strip() else fallback_html
 
     return (
-        "<tr><td style=\"padding: 24px 24px 0 24px;\">"
+        "<tr><td class=\"dmac-px\" style=\"padding: 24px 24px 0 24px;\">"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
         f" style=\"width: 100%; border-collapse: collapse; background: {DMAC_CARD};"
         f" border: 1px solid {DMAC_BRAND_PRIMARY};"
@@ -520,12 +545,12 @@ def _nix_analysis_section(
         f" {DMAC_BRAND_PRIMARY} 0%, {DMAC_BRAND_PRIMARY_DARK} 100%);"
         " padding: 16px 18px;\">"
         "<div style=\"display: inline-block; padding: 3px 9px; background:"
-        f" rgba(255,255,255,0.18); color: #ffffff; font-size: 9px;"
+        f" {DMAC_ON_BRAND_BADGE}; color: #ffffff; font-size: 9px;"
         " letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;"
         " border-radius: 999px;\">DMAC AI</div>"
         f"<h2 style=\"margin: 8px 0 2px 0; font-size: 18px; color: #ffffff;"
         " font-weight: 700; letter-spacing: 0.01em;\">Analisis de Nix</h2>"
-        f"<div style=\"font-size: 10px; color: rgba(255,255,255,0.85);"
+        f"<div style=\"font-size: 10px; color: {DMAC_ON_BRAND};"
         " letter-spacing: 0.08em; text-transform: uppercase;\">"
         "Generado por Nix Assistant / DMAC AI</div>"
         "</td></tr>"

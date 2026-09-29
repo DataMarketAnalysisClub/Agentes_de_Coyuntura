@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     email_to: str = ""
     email_cc: str = ""
     email_logo_path: str = "assets/Dmac_logo.png"
+    # Logo por HTTPS: Gmail no muestra imagenes data: y Outlook web/nuevo las
+    # bloquea. Vacio: se incrusta EMAIL_LOGO_PATH como data URI (previews).
+    email_logo_url: str = (
+        "https://raw.githubusercontent.com/DataMarketAnalysisClub/Agentes_de_Coyuntura/main/assets/Dmac_logo.png"
+    )
     # Avisos de salud de fuentes para mantenedores (nunca a la lista del club).
     # Vacio: los cambios de estado solo quedan en el log.
     ops_email_to: str = ""

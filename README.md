@@ -297,6 +297,9 @@ SMTP:
 - `EMAIL_FROM`
 - `EMAIL_TO`
 - `EMAIL_CC`
+- `EMAIL_LOGO_URL`: URL HTTPS del logo del correo (por defecto el PNG del
+  repo en GitHub). Vacio: se incrusta `assets/Dmac_logo.png` como `data:`,
+  que Gmail y Outlook web no muestran (solo para previews locales).
 - `OPS_EMAIL_TO`: mantenedores que reciben los avisos de salud de fuentes
   (separados por coma). Vacio: los cambios de estado solo quedan en el log.
   Nunca se usa la lista del club para estos avisos.

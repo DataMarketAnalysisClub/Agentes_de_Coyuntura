@@ -20,6 +20,7 @@ def _render_alert_html(
     snapshots,
     news_items: list,
     logo_path: str,
+    logo_url: str = "",
 ) -> str:
     link_map = (
         {n.title: n.url for n in news_items if n.title and n.url}
@@ -35,6 +36,7 @@ def _render_alert_html(
         brief_kind="alerta de alto impacto",
         news_link_map=link_map,
         logo_path=logo_path,
+        logo_url=logo_url,
     )
 
 
@@ -60,7 +62,7 @@ def run_high_impact_monitor_once() -> list[Alert]:
         text_body = generate_alert_text(item, snapshots)
         subject = f"DMAC Alert | Alto impacto financiero | {item.title[:80]}"
         html_body = _render_alert_html(
-            subject, text_body, snapshots, [item], settings.email_logo_path,
+            subject, text_body, snapshots, [item], settings.email_logo_path, settings.email_logo_url,
         )
         alert = Alert(now, item.title, item.impact_score, text_body, sent=False)
         output_path = _write_alert(now, item.title, text_body, html_body)

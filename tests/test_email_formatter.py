@@ -176,9 +176,40 @@ def test_assets_table_renders_sparkline_when_history_available() -> None:
 
     assert "1 mes" in html
     assert "Fuente</th>" not in html
-    assert "USDCLP &middot; yfinance" in html
+    # yfinance va en la nota al pie; solo otras fuentes se repiten en la fila.
+    assert "USDCLP &middot;" not in html
+    assert "TPM &middot; bcentral" in html
+    assert "Fuente: yfinance salvo indicacion" in html
     assert 'role="img"' in html
     assert html.count('<td style="border-bottom:') == 5
+
+
+def test_assets_table_compacts_large_prices() -> None:
+    from datetime import UTC, datetime
+
+    from services.email_charts import render_assets_table
+    from storage.models import MarketSnapshot
+
+    now = datetime.now(UTC)
+    html = render_assets_table([
+        MarketSnapshot(now, "BOVESPA", "Bovespa", 182459.75, -0.29, "yfinance"),
+        MarketSnapshot(now, "USDCLP", "USD/CLP", 968.97, 0.8, "yfinance"),
+    ])
+
+    assert "182,460" in html
+    assert "968.97" in html
+
+
+def test_email_logo_uses_https_url_on_white_chip_and_mobile_styles() -> None:
+    html = build_email_html("Asunto", "", logo_url="https://example.com/logo.png")
+
+    assert 'src="https://example.com/logo.png"' in html
+    assert "data:image" not in html
+    assert 'alt="DMAC"' in html
+    assert 'bgcolor="#ffffff"' in html
+    assert "@media only screen and (max-width: 480px)" in html
+    assert 'class="dmac-outer"' in html
+    assert "rgba(" not in html
 
 
 def test_assets_table_keeps_source_column_without_history() -> None:

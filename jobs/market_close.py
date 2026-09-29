@@ -162,6 +162,7 @@ def run_market_close() -> Brief:
         brief_kind="market close",
         news_link_map=_build_news_link_map(selected_news),
         logo_path=settings.email_logo_path,
+        logo_url=settings.email_logo_url,
         nix_analysis_html=nix_analysis_html or None,
         nix_chart_pngs=nix_charts_inline or None,
         include_deterministic_brief=not bool(nix_analysis_html),

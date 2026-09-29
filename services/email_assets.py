@@ -54,14 +54,21 @@ def get_logo_data_uri(path_str: str = "") -> str:
 def get_logo_img_tag(
     path_str: str = "",
     width: int = 48,
-    alt: str = "DMAC Logo",
+    alt: str = "DMAC",
+    url: str = "",
 ) -> str:
-    """Return an `<img>` tag with the inline logo, or '' if the logo is missing."""
-    uri = get_logo_data_uri(path_str)
-    if not uri:
+    """Return an `<img>` tag for the logo, or '' if there is no logo.
+
+    With `url`, the image is referenced over HTTPS (works in Gmail and
+    Outlook web/new, which drop or block `data:` images). Without it, the
+    local file is inlined as a data URI (useful for local previews only).
+    The alt text is styled so a blocked image still reads as "DMAC".
+    """
+    src = url or get_logo_data_uri(path_str)
+    if not src:
         return ""
     return (
-        f'<img src="{uri}" width="{width}" alt="{escape(alt)}" '
+        f'<img src="{escape(src)}" width="{width}" height="{width}" alt="{escape(alt)}" '
         f'style="display: block; border: 0; outline: none; text-decoration: none; '
-        f'width: {width}px; height: auto; margin: 0 0 12px 0;">'
+        f'width: {width}px; height: {width}px; color: #1e3a8a; font-size: 13px; font-weight: 700;">'
     )
