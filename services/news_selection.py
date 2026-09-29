@@ -68,7 +68,15 @@ def select_executive_news(
     limit: int = 3,
     per_source_limit: int = 1,
     per_topic_limit: int = 2,
+    guaranteed_region: str | None = "Chile",
 ) -> NewsSelectionResult:
+    """Titulares principales por puntaje, con cupos por fuente y tema.
+
+    `guaranteed_region`: si ningun titular elegido es de esa region y hay una
+    nota de ella que pasa el filtro de calidad, la mejor reemplaza al ultimo
+    elegido (el correo es para lectores chilenos). Nunca se fuerza una nota
+    que no pase calidad.
+    """
     selected: list[NewsItem] = []
     source_counts: dict[str, int] = defaultdict(int)
     topic_counts: dict[str, int] = defaultdict(int)
@@ -77,6 +85,7 @@ def select_executive_news(
     rejected_repeated = 0
     rejected_quality = 0
     rejected_caps = 0
+    regional_candidates: list[NewsItem] = []
 
     ordered = sorted(candidates, key=_executive_sort_key, reverse=True)
     for item in ordered:
@@ -88,6 +97,10 @@ def select_executive_news(
         if not quality.keep:
             rejected_quality += 1
             continue
+        if guaranteed_region and item.region == guaranteed_region:
+            regional_candidates.append(item)
+        if len(selected) >= limit:
+            continue
 
         source_key = normalize_text(item.source)
         topic_key = normalize_text(item.topic)
@@ -98,8 +111,9 @@ def select_executive_news(
         selected.append(item)
         source_counts[source_key] += 1
         topic_counts[topic_key] += 1
-        if len(selected) >= limit:
-            break
+
+    if guaranteed_region:
+        selected = _with_guaranteed_region(selected, regional_candidates, guaranteed_region, limit, per_source_limit)
 
     return NewsSelectionResult(
         selected=selected,
@@ -108,6 +122,26 @@ def select_executive_news(
         rejected_quality=rejected_quality,
         rejected_caps=rejected_caps,
     )
+
+
+def _with_guaranteed_region(
+    selected: list[NewsItem],
+    regional_candidates: list[NewsItem],
+    region: str,
+    limit: int,
+    per_source_limit: int,
+) -> list[NewsItem]:
+    if not regional_candidates or any(item.region == region for item in selected):
+        return selected
+    # Si la lista esta llena, el cupo sale del ultimo elegido (el de menor puntaje).
+    kept = selected[: limit - 1] if len(selected) >= limit else list(selected)
+    kept_sources = defaultdict(int)
+    for item in kept:
+        kept_sources[normalize_text(item.source)] += 1
+    for candidate in regional_candidates:
+        if kept_sources[normalize_text(candidate.source)] < per_source_limit:
+            return [*kept, candidate]
+    return selected
 
 
 def _executive_sort_key(item: NewsItem) -> tuple[int, int, int, object]:

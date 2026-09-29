@@ -116,13 +116,27 @@ def normalize_title(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
-def classify_region(title: str, summary: str = "") -> str:
+# Medios chilenos: sus notas de negocios rara vez dicen "Chile" ("Dolar abre
+# a la baja"), asi que sin otra senal de region se asumen chilenas. La
+# seccion Internacional de DF queda fuera.
+CHILEAN_NEWS_SOURCES = frozenset({"La Tercera Pulso", "Diario Financiero"})
+_FOREIGN_SECTION_MARKERS = ("/internacional/",)
+
+
+def default_region(source: str, url: str = "") -> str:
+    if source in CHILEAN_NEWS_SOURCES and not any(marker in url for marker in _FOREIGN_SECTION_MARKERS):
+        return "Chile"
+    return "Global"
+
+
+def classify_region(title: str, summary: str = "", default: str = "Global") -> str:
+    """Region por palabras clave; `default` si ninguna calza."""
     raw = f"{title} {summary}"
     text = normalize_text(raw)
     for region, pattern in _REGION_PATTERNS.items():
         if pattern.search(text) or (region == "EE.UU." and _US_UPPERCASE_PATTERN.search(raw)):
             return region
-    return "Global"
+    return default
 
 
 def classify_topic(title: str, summary: str = "") -> str:
@@ -174,7 +188,7 @@ def classify_news(items: Iterable[RawNewsItem]) -> list[NewsItem]:
                 title=item.title,
                 url=item.url,
                 summary=item.summary,
-                region=classify_region(item.title, item.summary),
+                region=classify_region(item.title, item.summary, default_region(item.source, item.url)),
                 topic=classify_topic(item.title, item.summary),
             )
         )

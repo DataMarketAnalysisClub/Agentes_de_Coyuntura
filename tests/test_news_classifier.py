@@ -5,10 +5,29 @@ import pytest
 from data_sources.rss_news_client import RawNewsItem
 from services.news_classifier import (
     canonicalize_url,
+    classify_news,
     classify_region,
     classify_topic,
     deduplicate_news,
 )
+
+
+def _raw(source: str, title: str, url: str) -> RawNewsItem:
+    return RawNewsItem(datetime(2026, 9, 29, tzinfo=UTC), source, title, url, "")
+
+
+def test_chilean_outlets_default_to_chile_unless_keywords_or_foreign_section() -> None:
+    items = classify_news(
+        [
+            _raw("Diario Financiero", "Dolar abre a la baja", "https://www.df.cl/mercados/bolsa-monedas/dolar"),
+            _raw("La Tercera Pulso", "Codelco anuncia nuevo proyecto", "https://www.latercera.com/pulso/noticia/codelco"),
+            _raw("Diario Financiero", "Anthropic advierte riesgos en su prospecto", "https://www.df.cl/internacional/ft/anthropic"),
+            _raw("Diario Financiero", "China prepara estimulos", "https://www.df.cl/mercados/commodities/china"),
+            _raw("Financial Times", "Bond investors turn oil traders", "https://www.ft.com/content/bonds"),
+        ]
+    )
+
+    assert [item.region for item in items] == ["Chile", "Chile", "Global", "Global", "Global"]
 
 
 def test_canonicalize_url_strips_tracking_params() -> None:

@@ -115,6 +115,81 @@ def test_select_executive_news_requires_macro_signal_for_non_official_sources() 
     assert result.rejected_quality == 1
 
 
+def _chile(title: str, url: str, now: datetime, source: str = "La Tercera Pulso", score: int = 5) -> NewsItem:
+    return NewsItem(now, source, title, url, "", "Chile", "FX", score)
+
+
+def test_guaranteed_chile_slot_replaces_lowest_ranked_headline() -> None:
+    now = datetime.now(UTC)
+    global_items = [
+        _news(f"Fed inflation rates signal {idx}", f"https://example.com/{idx}", now, source=source, score=9)
+        for idx, source in enumerate(["ECB", "Financial Times", "Reuters"])
+    ]
+    chile = _chile("Dolar cae y el peso se aprecia", "https://example.com/cl", now, score=0)
+
+    # Sin cupo, la nota chilena queda fuera por puntaje.
+    assert chile not in select_executive_news([*global_items, chile], per_topic_limit=5, guaranteed_region=None).selected
+    result = select_executive_news([*global_items, chile], per_topic_limit=5)
+
+    assert [item.title for item in result.selected] == [
+        "Fed inflation rates signal 0",
+        "Fed inflation rates signal 1",
+        "Dolar cae y el peso se aprecia",
+    ]
+
+
+def test_guaranteed_chile_slot_not_forced_when_no_chilean_news_passes_quality() -> None:
+    now = datetime.now(UTC)
+    items = [
+        _news(f"Fed inflation rates signal {idx}", f"https://example.com/{idx}", now, source=f"Source {idx}")
+        for idx in range(3)
+    ]
+    low_quality = _chile("Gremio de laboratorios destaca potencial exportador", "https://example.com/labs", now)
+
+    result = select_executive_news([*items, low_quality], per_topic_limit=5)
+
+    assert all(item.region == "Global" for item in result.selected)
+    assert len(result.selected) == 3
+
+
+def test_guaranteed_chile_slot_respects_source_cap_and_can_be_disabled() -> None:
+    now = datetime.now(UTC)
+    items = [
+        _news("ECB inflation rates signal", "https://example.com/b", now, source="ECB", score=9),
+        _news("Fed inflation rates signal", "https://example.com/a", now, source="La Tercera Pulso", score=9),
+        _news("Oil and dollar rally", "https://example.com/c", now, source="Financial Times", score=9),
+        _chile("Dolar cae en Chile", "https://example.com/cl1", now, source="La Tercera Pulso", score=0),
+        _chile("Cobre sube por huelga", "https://example.com/cl2", now, source="Diario Financiero", score=0),
+    ]
+
+    result = select_executive_news(items, per_topic_limit=5)
+    # La Tercera ya ocupa su cupo de fuente: entra la nota de DF.
+    assert result.selected[-1].title == "Cobre sube por huelga"
+    assert "Cobre sube por huelga" not in [
+        item.title for item in select_executive_news(items, per_topic_limit=5, guaranteed_region=None).selected
+    ]
+
+
+def test_administrative_central_bank_notices_are_filtered() -> None:
+    now = datetime.now(UTC)
+    items = [
+        _news("Federal Reserve Board announces approval of application by Peoples Bancorp", "https://x/1", now, source="Federal Reserve"),
+        _news("Federal Reserve Board issues enforcement action with former employee", "https://x/2", now, source="Federal Reserve"),
+        _news("Almost ten million people took part in ECB survey on new euro banknotes", "https://x/3", now, source="ECB"),
+        _news("Federal Reserve issues FOMC statement", "https://x/4", now, source="Federal Reserve"),
+        # Mismo patron fuera de un banco central: sigue compitiendo.
+        _news("SEC enforcement action hits big bank as rates rise", "https://x/5", now, source="Financial Times"),
+    ]
+
+    result = select_executive_news(items, per_source_limit=3, per_topic_limit=5)
+
+    assert [item.title for item in result.selected] == [
+        "Federal Reserve issues FOMC statement",
+        "SEC enforcement action hits big bank as rates rise",
+    ]
+    assert result.rejected_quality == 3
+
+
 def test_select_executive_news_filters_crypto_single_stock_noise() -> None:
     now = datetime.now(UTC)
     items = [

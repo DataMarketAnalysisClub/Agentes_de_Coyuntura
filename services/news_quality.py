@@ -13,6 +13,7 @@ SOURCE_TIERS = {
     "reuters": 2,
     "bloomberg": 2,
     "la tercera pulso": 2,
+    "diario financiero": 2,
     "marketwatch": 3,
     "investing.com": 3,
 }
@@ -41,6 +42,24 @@ LOW_VALUE_PATTERNS = (
     "motley fool",
     "the street",
     "seeking alpha",
+)
+
+# Comunicados administrativos de bancos centrales: su fuente es tier 1 y el
+# nombre "federal reserve" cuenta como alta senal, asi que antes pasaban
+# siempre y desplazaban a noticias de mercado. Se evaluan solo sobre el
+# titulo y solo para esas fuentes; FOMC, minutas y decisiones de tasas pasan.
+ADMINISTRATIVE_NOTICE_SOURCES = ("federal reserve", "ecb")
+ADMINISTRATIVE_NOTICE_PATTERNS = (
+    "approval of application",
+    "approval of the application",
+    "enforcement action",
+    "public comment",
+    "seek comment",
+    "request for comment",
+    "community bank",
+    "discount rate meetings",
+    "banknote",
+    "implementation guideline",
 )
 
 HIGH_SIGNAL_TERMS = (
@@ -96,6 +115,8 @@ def evaluate_news_quality(item: NewsItem) -> NewsQualityDecision:
 
     if any(pattern in text for pattern in LOW_VALUE_PATTERNS):
         return NewsQualityDecision(False, "low_value_pattern", 0)
+    if is_administrative_notice(item):
+        return NewsQualityDecision(False, "administrative_notice", 0)
 
     tier = source_tier(source)
     score = max(0, 5 - tier)
@@ -114,6 +135,14 @@ def evaluate_news_quality(item: NewsItem) -> NewsQualityDecision:
     if score < 4:
         return NewsQualityDecision(False, "low_editorial_score", score)
     return NewsQualityDecision(True, "selected_candidate", score)
+
+
+def is_administrative_notice(item: NewsItem) -> bool:
+    source = normalize_text(item.source)
+    if not any(name in source for name in ADMINISTRATIVE_NOTICE_SOURCES):
+        return False
+    title = normalize_text(item.title)
+    return any(pattern in title for pattern in ADMINISTRATIVE_NOTICE_PATTERNS)
 
 
 def source_tier(normalized_source: str) -> int:
