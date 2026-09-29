@@ -304,3 +304,30 @@ def test_render_nix_editorial_puts_chile_first_and_escapes() -> None:
     # Con parrafos, las viñetas (suelen repetir el titular en ingles) se omiten.
     assert "Bullet in English" not in html
     assert "Riesgo" in html and "Cautela" in html
+
+
+def test_indicators_show_period_and_change_in_points_with_neutral_color() -> None:
+    from datetime import UTC, datetime
+
+    from services.email_charts import (
+        format_snapshot_change,
+        format_snapshot_value,
+        render_assets_table,
+    )
+    from services.email_formatter import DMAC_NEUTRAL
+    from storage.models import MarketSnapshot
+
+    now = datetime.now(UTC)
+    ipc12 = MarketSnapshot(now, "IPC12", "IPC 12 meses", 4.1, None, "bcentral", period="ago-26", change_points=0.6)
+    tpm = MarketSnapshot(now, "TPM", "TPM", 4.5, None, "bcentral", period="29-09", change_points=0.0)
+    uf = MarketSnapshot(now, "UF", "UF", 41049.01, 0.02, "bcentral")
+
+    assert format_snapshot_value(ipc12) == "4,1%"
+    # Subir la inflacion no es "verde": color neutro.
+    assert format_snapshot_change(ipc12) == ("+0,6 pp", DMAC_NEUTRAL)
+    assert format_snapshot_change(tpm)[0] == "sin cambio"
+    assert format_snapshot_value(uf) == "41.049,01"
+
+    html = render_assets_table([ipc12, tpm, uf])
+    assert "BCCh · ago-26" in html
+    assert "BCCh · 29-09" in html

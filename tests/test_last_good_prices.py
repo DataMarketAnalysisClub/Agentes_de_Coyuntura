@@ -68,5 +68,6 @@ def test_display_names_cover_fx_and_macro() -> None:
     names = market_display_names()
 
     assert names["USDPEN"] == "USD/PEN"
-    assert names["DESEMPLEO"] == "Desempleo Chile"
+    assert names["DESEMPLEO"] == "Desempleo"
+    assert names["DOLAR_OBS"] == "Dólar observado"
     assert names["IPSA"] == "IPSA"

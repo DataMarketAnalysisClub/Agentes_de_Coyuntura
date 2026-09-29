@@ -74,3 +74,19 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "allow_front_contract_lookup: no parchea la resolucion del contrato vigente de futuros"
     )
+
+
+@pytest.fixture(autouse=True)
+def _ignore_local_env_file(monkeypatch):
+    """Los tests no leen el `.env` local (credenciales reales, SMTP, IA).
+
+    Sin esto, Settings() tomaba las credenciales del BCCh del `.env` del
+    desarrollador: los tests dejaban de ser deterministas y un assert fallido
+    podia imprimir la contrasena en la salida de pytest.
+    """
+    from app.config import Settings, get_settings
+
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()

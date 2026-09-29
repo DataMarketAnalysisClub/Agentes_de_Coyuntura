@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     bcentral_ipc_series: str = "F074.IPC.VAR.Z.Z.C.M"
     bcentral_unemployment_series: str = "F049.DES.TAS.INE9.10.M"
     bcentral_usdpen_series: str = "F072.PEN.USD.N.O.D"
+    # Series verificadas con SearchSeries el 2026-09-29.
+    bcentral_ipc12_series: str = "F074.IPC.V12.Z.EP23.C.M"
+    bcentral_imacec_series: str = "F032.IMC.V12.Z.Z.2018.Z.Z.0.M"
+    bcentral_dolar_observado_series: str = "F073.TCO.PRE.Z.D"
+    bcentral_uf_series: str = "F073.UFF.PRE.Z.D"
+    bcentral_copper_series: str = "F019.PPB.PRE.100.D"
     bcentral_timeout_seconds: float = 20.0
 
     market_data_provider: str = "yfinance"

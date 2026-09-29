@@ -1,6 +1,7 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
@@ -14,12 +15,48 @@ logger = logging.getLogger(__name__)
 # Tipos de cambio que se toman del BCCh en vez de Yahoo: (simbolo, nombre,
 # atributo de Settings con el codigo de serie). USD/PEN salio de yfinance
 # porque PEN=X traia velas inconsistentes (sep-2026).
+# Dolar observado, UF y cobre BML son referencias oficiales diarias: se
+# muestran junto a las de Yahoo (intradia), no las reemplazan.
 BCENTRAL_FX_SERIES: tuple[tuple[str, str, str], ...] = (
     ("USDPEN", "USD/PEN", "bcentral_usdpen_series"),
+    ("DOLAR_OBS", "Dólar observado", "bcentral_dolar_observado_series"),
+    ("UF", "UF", "bcentral_uf_series"),
+    ("COBRE_BML", "Cobre BML", "bcentral_copper_series"),
 )
 
 
-MACRO_INDICATOR_SYMBOLS: tuple[str, ...] = ("TPM", "IPC", "DESEMPLEO")
+@dataclass(frozen=True)
+class MacroIndicator:
+    symbol: str
+    name: str
+    setting: str  # atributo de Settings con el codigo de serie
+    lookback_days: int
+    monthly: bool  # rotula el periodo como "ago-26" (mensual) o "29-09" (diario)
+
+
+# Indicadores del BCCh: nivel del ultimo dato, su periodo y el cambio contra
+# el dato anterior. Codigos verificados con SearchSeries el 2026-09-29.
+MACRO_INDICATORS: tuple[MacroIndicator, ...] = (
+    MacroIndicator("TPM", "TPM", "bcentral_tpm_series", 120, monthly=False),
+    MacroIndicator("IPC12", "IPC 12 meses", "bcentral_ipc12_series", 400, monthly=True),
+    MacroIndicator("IPC", "IPC mensual", "bcentral_ipc_series", 400, monthly=True),
+    MacroIndicator("IMACEC", "IMACEC 12 meses", "bcentral_imacec_series", 400, monthly=True),
+    # Trimestre movil del INE: el periodo es el ultimo mes del trimestre.
+    MacroIndicator("DESEMPLEO", "Desempleo", "bcentral_unemployment_series", 400, monthly=True),
+)
+
+MACRO_INDICATOR_SYMBOLS: tuple[str, ...] = tuple(indicator.symbol for indicator in MACRO_INDICATORS)
+
+_MONTH_ABBR = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def format_period(observed_at: date | None, monthly: bool) -> str:
+    """"ago-26" para datos mensuales, "29-09" para diarios, '' sin fecha."""
+    if observed_at is None:
+        return ""
+    if monthly:
+        return f"{_MONTH_ABBR[observed_at.month - 1]}-{observed_at:%y}"
+    return f"{observed_at:%d-%m}"
 
 
 def expected_market_symbols() -> list[str]:
@@ -40,7 +77,7 @@ def market_display_names(snapshots: list[MarketSnapshot] = ()) -> dict[str, str]
     """Nombre legible por simbolo esperado (para avisos al lector)."""
     names = {asset.symbol: asset.name for asset in DEFAULT_ASSETS}
     names.update({symbol: name for symbol, name, _ in BCENTRAL_FX_SERIES})
-    names.update({"TPM": "TPM Chile", "IPC": "IPC mensual Chile", "DESEMPLEO": "Desempleo Chile"})
+    names.update({indicator.symbol: indicator.name for indicator in MACRO_INDICATORS})
     names.update({snapshot.symbol: snapshot.name for snapshot in snapshots if snapshot.name})
     return names
 
@@ -185,21 +222,43 @@ class MarketSnapshotService:
         return quotes
 
     def _collect_bcentral_indicators(self, timestamp: datetime) -> list[MarketSnapshot]:
-        indicators = (
-            ("TPM", "TPM Chile", self.bcentral_client.fetch_policy_rate),
-            ("IPC", "IPC mensual Chile", self.bcentral_client.fetch_inflation),
-            ("DESEMPLEO", "Desempleo Chile", self.bcentral_client.fetch_unemployment),
-        )
-        with ThreadPoolExecutor(max_workers=len(indicators)) as executor:
-            futures = [(symbol, name, executor.submit(fetch)) for symbol, name, fetch in indicators]
+        settings = getattr(self.bcentral_client, "settings", None) or get_settings()
+        with ThreadPoolExecutor(max_workers=len(MACRO_INDICATORS)) as executor:
+            futures = [
+                (
+                    indicator,
+                    executor.submit(
+                        self.bcentral_client.fetch_indicator,
+                        getattr(settings, indicator.setting),
+                        indicator.lookback_days,
+                    ),
+                )
+                for indicator in MACRO_INDICATORS
+            ]
         items: list[MarketSnapshot] = []
-        for symbol, name, future in futures:
+        for indicator, future in futures:
             try:
-                value = future.result()
+                reading = future.result()
             except Exception:
-                logger.warning("Failed to fetch BCentral indicator", extra={"symbol": symbol}, exc_info=True)
+                logger.warning("Failed to fetch BCentral indicator", extra={"symbol": indicator.symbol}, exc_info=True)
                 continue
-            items.append(MarketSnapshot(timestamp, symbol, name, value, None, "bcentral"))
+            if reading is None:
+                # Sin dato: la salud de fuentes y la linea "Sin datos" lo reportan.
+                items.append(MarketSnapshot(timestamp, indicator.symbol, indicator.name, None, None, "bcentral"))
+                continue
+            change = None if reading.previous is None else round(reading.value - reading.previous, 4)
+            items.append(
+                MarketSnapshot(
+                    timestamp,
+                    indicator.symbol,
+                    indicator.name,
+                    reading.value,
+                    None,
+                    "bcentral",
+                    period=format_period(reading.observed_at, indicator.monthly),
+                    change_points=change,
+                )
+            )
         return items
 
 

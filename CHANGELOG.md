@@ -2,6 +2,20 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Agregado (series del Banco Central)
+- Dolar observado, UF y cobre BML como series diarias del BCCh con ~1 mes
+  de historia, junto a los precios de Yahoo (no los reemplazan).
+- IPC 12 meses e IMACEC 12 meses. TPM, IPC mensual, IPC 12 meses, IMACEC y
+  desempleo muestran su periodo ("ago-26", "29-09") y el cambio en puntos
+  porcentuales contra el dato anterior, en color neutro. Nuevo
+  `BCentralClient.fetch_indicator` (valor, fecha y valor anterior).
+- Codigos verificados con `SearchSeries` y documentados en el README. El IPSA
+  del BCCh es solo mensual: el diario sigue viniendo de Yahoo.
+
+### Corregido (tests)
+- Los tests ya no leen el `.env` local: con credenciales reales, `Settings()`
+  las tomaba y un assert fallido podia imprimir la contrasena del BCCh.
+
 ### Cambiado (diseno "Editorial" del correo)
 - Nuevo look elegido en Claude Design (propuesta A): fondo marfil, titulares
   en Georgia, cabecera tipo periodico con logo, fecha larga en espanol y

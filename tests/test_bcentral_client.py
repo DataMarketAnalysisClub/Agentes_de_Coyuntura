@@ -127,3 +127,29 @@ def test_non_success_code_is_logged_with_description(caplog) -> None:
     record = next(r for r in caplog.records if r.getMessage() == "BCentral API returned non-success code")
     assert record.code == -5
     assert record.description == "Invalid username or password"
+
+
+def test_fetch_indicator_returns_last_value_date_and_previous() -> None:
+    payload = {
+        "Codigo": 0,
+        "Series": {
+            "Obs": [
+                {"indexDateString": "01-06-2026", "value": "4.3"},
+                {"indexDateString": "01-07-2026", "value": "3.5"},
+                {"indexDateString": "01-08-2026", "value": "4.1"},
+                {"indexDateString": "01-09-2026", "value": "NaN"},
+            ]
+        },
+    }
+    client = BCentralClient(SETTINGS, FakeHttpClient(payload))
+
+    reading = client.fetch_indicator("F074.IPC.V12.Z.EP23.C.M")
+
+    assert reading is not None
+    assert (reading.observed_at, reading.value, reading.previous) == (date(2026, 8, 1), 4.1, 3.5)
+
+
+def test_fetch_indicator_without_data_returns_none() -> None:
+    client = BCentralClient(SETTINGS, FakeHttpClient({"Codigo": 0, "Series": {"Obs": []}}))
+
+    assert client.fetch_indicator("SERIES") is None

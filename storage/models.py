@@ -16,6 +16,11 @@ class MarketSnapshot:
     # Solo para mostrar: si no es None, `price` es el ultimo dato valido
     # guardado en esa fecha (la fuente no trajo datos hoy). Nunca se persiste.
     as_of: datetime | None = field(default=None, compare=False)
+    # Solo para mostrar (no se persisten): periodo al que corresponde un
+    # indicador ("ago-26", "29-09") y su cambio respecto del dato anterior en
+    # las unidades del indicador (puntos porcentuales para tasas).
+    period: str = field(default="", compare=False)
+    change_points: float | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)

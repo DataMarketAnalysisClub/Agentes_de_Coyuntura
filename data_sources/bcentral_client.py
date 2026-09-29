@@ -32,6 +32,16 @@ class BCentralObservation:
     value: float
 
 
+@dataclass(frozen=True)
+class BCentralIndicator:
+    """Ultimo dato de un indicador y el valor anterior (para su cambio)."""
+
+    series_id: str
+    observed_at: date | None
+    value: float
+    previous: float | None
+
+
 class BCentralClient:
     """Banco Central de Chile SieteRestWS client."""
 
@@ -73,6 +83,15 @@ class BCentralClient:
             change_pct = round((last.value / observations[-2].value - 1) * 100, 4)
         history = tuple(item.value for item in observations[-FX_HISTORY_POINTS:])
         return Quote(symbol, name, last.value, change_pct, "bcentral", history=history)
+
+    def fetch_indicator(self, series_id: str, lookback_days: int = 400) -> BCentralIndicator | None:
+        """Ultimo dato del indicador con su fecha y el valor anterior."""
+        observations = self.fetch_observations(series_id, lookback_days)
+        if not observations:
+            return None
+        last = observations[-1]
+        previous = observations[-2].value if len(observations) >= 2 else None
+        return BCentralIndicator(series_id, last.observed_at, last.value, previous)
 
     def fetch_latest_observation(self, series_id: str, lookback_days: int = 365) -> BCentralObservation | None:
         observations = self.fetch_observations(series_id, lookback_days)

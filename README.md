@@ -44,11 +44,24 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 ### Fuentes de Datos
 
 **Datos economicos:**
-- BCCh API (requiere credenciales): TPM, IPC, tasa de desempleo (INE,
-  mensual) y USD/PEN (`F072.PEN.USD.N.O.D`, diaria, con ~1 mes de historia
-  para la sparkline). Las series se piden en paralelo con yfinance; los dias
-  sin dato (`NaN`) se ignoran y una serie diaria con mas de 7 dias de
-  antiguedad no se muestra.
+- BCCh API (requiere credenciales; codigos verificados con `SearchSeries`
+  el 2026-09-29). Las series se piden en paralelo con yfinance; los dias sin
+  dato (`NaN`) se ignoran.
+  - Indicadores (nivel, periodo y cambio en pp contra el dato anterior):
+    TPM (`F022.TPM.TIN.D001.NO.Z.D`), IPC 12 meses
+    (`F074.IPC.V12.Z.EP23.C.M`, base 2023), IPC mensual
+    (`F074.IPC.VAR.Z.Z.C.M`), IMACEC 12 meses
+    (`F032.IMC.V12.Z.Z.2018.Z.Z.0.M`) y desempleo INE, trimestre movil no
+    ajustado (`F049.DES.TAS.INE9.10.M`).
+  - Series diarias con ~1 mes de historia: dolar observado
+    (`F073.TCO.PRE.Z.D`), UF (`F073.UFF.PRE.Z.D`; se pide hasta hoy porque
+    el BCCh publica la UF por adelantado), cobre refinado BML en USD/lb
+    (`F019.PPB.PRE.100.D`) y USD/PEN (`F072.PEN.USD.N.O.D`). Una serie
+    diaria con mas de 7 dias de antiguedad no se muestra. El dolar observado
+    y el cobre BML son referencias oficiales junto a los precios intradia de
+    Yahoo, no los reemplazan.
+  - El IPSA del BCCh (`F013.IBC.IND.N.7.LAC.CL.CLP.BLO.M`) es solo mensual:
+    el IPSA diario sigue viniendo de Yahoo.
 - yfinance (`1.7.0`, fijada): precios de activos (USDCLP, COPPER, IPSA,
   SP500, etc.) y ~1 mes de cierres diarios para las sparklines del correo.
   Unica fuente de datos de mercado (Google Finance se retiro del pipeline).
@@ -323,9 +336,14 @@ Banco Central de Chile:
 - `BCENTRAL_PASSWORD`: contrasena BCCh. Puede omitirse si se usa `BCENTRAL_CREDENTIALS_FILE`.
 - `BCENTRAL_CREDENTIALS_FILE`: ruta a archivo externo no versionado. Formato esperado: primera linea correo, segunda linea contrasena.
 - `BCENTRAL_TPM_SERIES`: serie para TPM. Default: `F022.TPM.TIN.D001.NO.Z.D`.
-- `BCENTRAL_IPC_SERIES`: serie para IPC/inflacion. Default: `F074.IPC.VAR.Z.Z.C.M`.
+- `BCENTRAL_IPC_SERIES`: IPC variacion mensual. Default: `F074.IPC.VAR.Z.Z.C.M`.
 - `BCENTRAL_UNEMPLOYMENT_SERIES`: tasa de desocupacion (INE). Default: `F049.DES.TAS.INE9.10.M`.
 - `BCENTRAL_USDPEN_SERIES`: soles peruanos por dolar. Default: `F072.PEN.USD.N.O.D`.
+- `BCENTRAL_IPC12_SERIES`: IPC variacion 12 meses. Default: `F074.IPC.V12.Z.EP23.C.M`.
+- `BCENTRAL_IMACEC_SERIES`: IMACEC variacion 12 meses. Default: `F032.IMC.V12.Z.Z.2018.Z.Z.0.M`.
+- `BCENTRAL_DOLAR_OBSERVADO_SERIES`: dolar observado. Default: `F073.TCO.PRE.Z.D`.
+- `BCENTRAL_UF_SERIES`: valor diario de la UF. Default: `F073.UFF.PRE.Z.D`.
+- `BCENTRAL_COPPER_SERIES`: cobre refinado BML (USD/lb). Default: `F019.PPB.PRE.100.D`.
 - `BCENTRAL_TIMEOUT_SECONDS`: timeout HTTP para BCCh.
 
 Ejemplo local seguro:

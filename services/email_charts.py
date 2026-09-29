@@ -35,14 +35,16 @@ from storage.models import MarketSnapshot
 YIELD_SYMBOLS = frozenset({"US10Y"})
 # Indicadores que son tasas o porcentajes: se muestran con "%" y los
 # decimales indicados.
-PERCENT_LEVEL_DECIMALS = {"TPM": 2, "IPC": 1, "DESEMPLEO": 1}
+PERCENT_LEVEL_DECIMALS = {"TPM": 2, "IPC12": 1, "IPC": 1, "IMACEC": 1, "DESEMPLEO": 1}
+# Valores >= 10.000 que igual llevan decimales (la UF se lee con centavos).
+KEEP_DECIMALS_SYMBOLS = frozenset({"UF"})
 
 # Grupos de la tabla de mercados, en orden de lectura para un lector chileno.
 # Un simbolo que no aparece aqui va al final, en "Otros".
 MARKET_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Chile", ("USDCLP", "IPSA", "TPM", "IPC", "DESEMPLEO")),
+    ("Chile", ("USDCLP", "DOLAR_OBS", "UF", "IPSA", "TPM", "IPC12", "IPC", "IMACEC", "DESEMPLEO")),
     ("Estados Unidos", ("SP500", "VOO", "NASDAQ100", "US10Y", "DXY")),
-    ("Materias primas", ("COPPER", "GOLD", "WTI", "BRENT")),
+    ("Materias primas", ("COPPER", "COBRE_BML", "GOLD", "WTI", "BRENT")),
     ("Resto del mundo", ("EUROSTOXX50", "BOVESPA", "MEXIPC", "USDBRL", "USDMXN", "USDCOP", "USDPEN")),
 )
 
@@ -59,16 +61,28 @@ def format_snapshot_value(snap: MarketSnapshot) -> str:
         return f"{format_number(snap.price, 2)}%"
     if snap.symbol in PERCENT_LEVEL_DECIMALS:
         return f"{format_number(snap.price, PERCENT_LEVEL_DECIMALS[snap.symbol])}%"
-    if abs(snap.price) >= 10_000:
+    if abs(snap.price) >= 10_000 and snap.symbol not in KEEP_DECIMALS_SYMBOLS:
         # Indices: sin decimales para ahorrar ancho en telefonos.
         return format_number(snap.price, 0)
     return format_number(snap.price, 2)
 
 
 def format_snapshot_change(snap: MarketSnapshot) -> tuple[str, str]:
-    """(texto, color) de la variacion del dia; en pb para rendimientos."""
+    """(texto, color) de la variacion: % del dia, pb para rendimientos y pp
+    contra el dato anterior para indicadores (TPM, IPC, desempleo...).
+
+    El cambio de los indicadores va en color neutro: que suba el desempleo o
+    la inflacion no es "verde".
+    """
+    if snap.symbol in PERCENT_LEVEL_DECIMALS:
+        if snap.change_points is None:
+            return ("", _color_for_change(None))
+        points = round(snap.change_points, 1)
+        if points == 0:
+            return ("sin cambio", _color_for_change(None))
+        return (f"{'+' if points > 0 else ''}{format_number(points, 1)} pp", _color_for_change(None))
     if snap.change_pct is None:
-        return ("s/d" if snap.symbol not in PERCENT_LEVEL_DECIMALS else "", _color_for_change(None))
+        return ("s/d", _color_for_change(None))
     color = _color_for_change(snap.change_pct)
     if snap.symbol in YIELD_SYMBOLS and snap.price is not None:
         previous = snap.price / (1 + snap.change_pct / 100)
@@ -302,6 +316,8 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
             notes: list[str] = []
             if (snap.source or "") != _DEFAULT_TABLE_SOURCE:
                 notes.append(_SOURCE_LABELS.get(snap.source or "", snap.source or "-"))
+            if snap.period:
+                notes.append(snap.period)
             as_of = format_as_of(snap)
             if as_of:
                 # Ultimo dato valido (la fuente no trajo datos hoy): se rotula
@@ -342,7 +358,8 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
     footnote = (
         f"<div style=\"margin-top: 8px; font-size: 12px; color: {DMAC_MUTED};\">"
         "Fuente: Yahoo Finance salvo indicación (BCCh: Banco Central de Chile)."
-        " Tasas en % y su variación en puntos base (pb)."
+        " Tasas en % con su variación en puntos base (pb); indicadores con su período"
+        " y cambio en puntos porcentuales (pp) contra el dato anterior."
         f"{' 1 mes: cierres diarios.' if with_trend else ''}</div>"
     )
     return _section_row(
