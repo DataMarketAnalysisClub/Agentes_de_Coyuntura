@@ -25,7 +25,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 from zoneinfo import ZoneInfo
 
@@ -507,6 +507,14 @@ _PREHEADER_MAX = 140
 _PREHEADER_FILLER = "&#847;&zwnj;&nbsp;" * 60
 
 
+def extract_nix_headline(nix_html: str | None) -> str:
+    """Titular de Nix (texto plano) desde el HTML de `render_nix_editorial`."""
+    from html import unescape
+
+    lead = _LEAD_RE.search(nix_html or "")
+    return " ".join(unescape(lead.group(1)).split()) if lead else ""
+
+
 def _default_preheader(nix_html: str | None, news_items: list | None, intro: str) -> str:
     """Titular de Nix, o el primer titular de noticias, o la intro."""
     lead = _LEAD_RE.search(nix_html or "")
@@ -539,13 +547,15 @@ def edition_label(brief_kind: str) -> str:
     return _EDITION_LABELS.get(brief_kind.strip().lower(), brief_kind.strip().capitalize() or "Brief")
 
 
-def long_spanish_date(subject: str, now: datetime | None = None) -> str:
-    """"Martes 29 de septiembre de 2026" desde la fecha del asunto (o hoy en Chile)."""
+def long_spanish_date(subject: str, now: datetime | None = None, edition_date: date | None = None) -> str:
+    """"Martes 29 de septiembre de 2026": fecha de la edicion, la del asunto o hoy en Chile."""
     match = _SUBJECT_DATE_RE.search(subject)
     try:
         day = datetime(int(match.group(1)), int(match.group(2)), int(match.group(3))) if match else None
     except ValueError:
         day = None
+    if edition_date is not None:
+        day = datetime(edition_date.year, edition_date.month, edition_date.day)
     if day is None:
         day = (now or datetime.now(_CHILE_TZ)).astimezone(_CHILE_TZ)
     weekday = _WEEKDAYS[day.weekday()].capitalize()
@@ -558,6 +568,7 @@ def _header_html(
     logo_path: str = "",
     logo_url: str = "",
     brief_kind: str = "brief",
+    edition_date: date | None = None,
 ) -> str:
     logo_img = get_logo_img_tag(logo_path, width=56, url=logo_url)
     # Con el logo embebido (cid:), el fondo blanco viene dentro del PNG: el
@@ -590,7 +601,7 @@ def _header_html(
         "</tr></table>"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\"><tr>"
         f"<td style=\"border-top: 1px solid {DMAC_INK}; padding-top: 8px; font-size: 13px; color: {DMAC_INK};\">"
-        f"{escape(long_spanish_date(subject))}</td>"
+        f"{escape(long_spanish_date(subject, edition_date=edition_date))}</td>"
         f"<td align=\"right\" style=\"border-top: 1px solid {DMAC_INK}; padding-top: 8px; font-size: 13px;"
         f" color: {DMAC_INK};\">{escape(edition_label(brief_kind))}</td>"
         "</tr></table>"
@@ -644,6 +655,7 @@ def build_email_html(
     news_charts: list | None = None,
     unavailable_sources: list[str] | None = None,
     preheader: str | None = None,
+    edition_date: date | None = None,
 ) -> str:
     """Build the HTML email from text body, snapshots, news and AI analysis.
 
@@ -708,6 +720,10 @@ def build_email_html(
         f"<p style=\"margin: 0; color: {DMAC_MUTED};\">Sin contenido relevante para esta corrida.</p>"
     )
 
+    header_html = _header_html(
+        subject, intro_text, logo_path=logo_path, logo_url=logo_url, brief_kind=brief_kind,
+        edition_date=edition_date,
+    )
     return (
         "<!doctype html><html lang=\"es\"><head>"
         "<meta charset=\"utf-8\">"
@@ -730,7 +746,7 @@ def build_email_html(
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\""
         f" bgcolor=\"{DMAC_PAPER}\" style=\"width: 100%; max-width: {EMAIL_WIDTH_PX}px; background: {DMAC_PAPER};"
         f" border: 1px solid {DMAC_RULE}; color: {DMAC_TEXT};\">"
-        f"{_header_html(subject, intro_text, logo_path=logo_path, logo_url=logo_url, brief_kind=brief_kind)}"
+        f"{header_html}"
         f"{body_html}"
         "<tr><td style=\"height: 32px; line-height: 32px; font-size: 0;\">&nbsp;</td></tr>"
         f"{_footer_html()}"

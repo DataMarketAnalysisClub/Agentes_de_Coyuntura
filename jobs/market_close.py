@@ -7,11 +7,11 @@ from app.config import get_settings
 from jobs.common import chile_now, collect_market_and_news_with_health, write_output_bundle
 from services.ai.editorial_pipeline import run_phase3_pipeline
 from services.ai.news_chart_readings import select_news_charts_with_readings
-from services.email_formatter import build_email_html, render_nix_editorial
+from services.email_formatter import build_email_html, extract_nix_headline, render_nix_editorial
 from services.email_sender import EmailSender
 from services.market_sentiment import collect_market_sentiment
 from services.news_selection import select_executive_news
-from services.summarizer import generate_market_close
+from services.summarizer import generate_market_close, headline_subject
 from storage.models import Brief
 from storage.repositories import BriefRepository, NewsRepository
 
@@ -94,8 +94,10 @@ def run_market_close() -> Brief:
     nix_analysis_html, nix_chart_pngs = _generate_nix_analysis(selected_news, snapshots, settings)
     nix_charts_inline = _build_nix_charts_cid_map(nix_chart_pngs)
     news_charts = select_news_charts_with_readings(selected_news, snapshots, settings)
+    # Asunto con el titular de Nix; sin IA queda el asunto fijo.
+    subject = headline_subject("close", now.date(), extract_nix_headline(nix_analysis_html), generated.subject)
     html_body = build_email_html(
-        generated.subject,
+        subject,
         generated.text_body,
         snapshots=collected.display_snapshots,
         news_items=selected_news,
@@ -110,15 +112,16 @@ def run_market_close() -> Brief:
         market_sentiment=market_sentiment,
         news_charts=news_charts,
         unavailable_sources=collected.unavailable,
+        edition_date=now.date(),
     )
     stem = f"market_close_{now:%Y%m%d_%H%M%S}"
     output_path = write_output_bundle(Path("outputs/briefs"), stem, generated.text_body, html_body)
 
-    brief = Brief(now, "market_close", generated.subject, generated.text_body, html_body, str(output_path))
+    brief = Brief(now, "market_close", subject, generated.text_body, html_body, str(output_path))
     BriefRepository().save(brief)
     news_repository.save_mentions(selected_news, now)
     EmailSender(settings).send(
-        generated.subject,
+        subject,
         generated.text_body,
         html_body,
         settings.email_enabled,

@@ -11,6 +11,28 @@ class GeneratedBrief:
     text_body: str
 
 
+_MONTH_ABBR = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+_SUBJECT_PREFIX = {"morning": "DMAC Brief", "close": "DMAC Cierre"}
+# Largo maximo del titular en el asunto: Outlook y Gmail muestran ~60-80
+# caracteres en la bandeja y el resto se corta igual.
+SUBJECT_HEADLINE_MAX = 80
+
+
+def headline_subject(kind: str, current_date: date, headline: str, fallback: str) -> str:
+    """Asunto con el titular del dia: "DMAC Brief · 29 sep — <titular>".
+
+    Sin titular (IA apagada o fallida) devuelve `fallback`, el asunto fijo.
+    """
+    headline = " ".join((headline or "").split())
+    if not headline:
+        return fallback
+    if len(headline) > SUBJECT_HEADLINE_MAX:
+        cut = headline[: SUBJECT_HEADLINE_MAX - 1].rsplit(" ", 1)[0].rstrip(" ,;:.")
+        headline = f"{cut}…"
+    day = f"{current_date.day} {_MONTH_ABBR[current_date.month - 1]}"
+    return f"{_SUBJECT_PREFIX.get(kind, 'DMAC Brief')} · {day} — {headline}"
+
+
 def _select_symbols(snapshots: list[MarketSnapshot], symbols: tuple[str, ...]) -> list[str]:
     by_symbol = {snapshot.symbol: snapshot for snapshot in snapshots}
     lines: list[str] = []

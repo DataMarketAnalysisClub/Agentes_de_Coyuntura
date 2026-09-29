@@ -2,6 +2,12 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Cambiado (asunto con el titular)
+- El asunto lleva el titular de Nix: "DMAC Brief · 29 sep — <titular>" (y
+  "DMAC Cierre · ..." en el cierre), recortado a 80 caracteres. Sin IA se
+  mantiene el asunto fijo. La fecha larga de la cabecera ya no se lee del
+  asunto: los jobs pasan `edition_date`.
+
 ### Corregido (modo oscuro, logo y presentacion en la bandeja)
 - Se retira la paleta oscura propia: Outlook nuevo la aplicaba segun el tema
   de Windows aunque el lector eligiera "fondo claro", y ademas convertia los

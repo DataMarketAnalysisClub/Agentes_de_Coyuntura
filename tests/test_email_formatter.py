@@ -358,3 +358,36 @@ def test_preheader_falls_back_to_first_headline_and_truncates() -> None:
     assert _default_preheader("", [], "intro") == "intro"
     long_text = render_preheader("x" * 300)
     assert "x" * 139 + "…" in long_text
+
+
+def test_headline_subject_uses_nix_headline_and_falls_back() -> None:
+    from datetime import date
+
+    from services.email_formatter import extract_nix_headline, render_nix_editorial
+    from services.summarizer import SUBJECT_HEADLINE_MAX, headline_subject
+
+    class Email:
+        headline = "Rendimientos de EE.UU. impulsan al dólar &amp; al cobre"
+        executive_summary: list = []
+        sections: list = []
+        risk_flags: list = []
+        editorial_cautions: list = []
+
+    headline = extract_nix_headline(render_nix_editorial(Email()))
+    assert headline == "Rendimientos de EE.UU. impulsan al dólar &amp; al cobre"
+    subject = headline_subject("morning", date(2026, 9, 29), headline, "fijo")
+    assert subject == "DMAC Brief · 29 sep — Rendimientos de EE.UU. impulsan al dólar &amp; al cobre"
+    assert headline_subject("close", date(2026, 9, 29), "x", "fijo").startswith("DMAC Cierre · 29 sep — ")
+    assert headline_subject("morning", date(2026, 9, 29), "", "fijo") == "fijo"
+
+    long_subject = headline_subject("morning", date(2026, 9, 29), "palabra " * 30, "fijo")
+    assert long_subject.endswith("…")
+    assert len(long_subject.split(" — ", 1)[1]) <= SUBJECT_HEADLINE_MAX
+
+
+def test_header_uses_edition_date_when_subject_has_no_iso_date() -> None:
+    from datetime import date
+
+    html = build_email_html("DMAC Brief · 29 sep — Titular", "", edition_date=date(2026, 9, 29))
+
+    assert "Martes 29 de septiembre de 2026" in html
