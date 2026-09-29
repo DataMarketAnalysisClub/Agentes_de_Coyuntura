@@ -45,20 +45,27 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 
 **Datos economicos:**
 - BCCh API: TPM, IPC (requiere credenciales)
-- yfinance: precios de activos (USDCLP, COPPER, IPSA, SP500, etc.)
-- Google Finance: resumen publico best-effort para sentimiento de mercado
-  (indices, futuros, VIX y commodities). Si falla, el reporte continua con
-  `yfinance`.
+- yfinance (`1.7.0`, fijada): precios de activos (USDCLP, COPPER, IPSA,
+  SP500, etc.) y ~1 mes de cierres diarios para las sparklines del correo.
+  Unica fuente de datos de mercado (Google Finance se retiro del pipeline).
+  - IPSA: Yahoo dejo de publicar `^IPSA`; se usa `MXIPSAGC.SN` (Bolsa de
+    Santiago, mismo nivel que el S&P IPSA) con velas horarias, porque su
+    historial diario en Yahoo viene incompleto.
+  - Series con velas inconsistentes (cierre fuera de maximo/minimo) o con
+    ultimo cierre de hace mas de 7 dias se descartan y se muestran como
+    "s/d". Hoy afecta a `PEN=X` (USD/PEN).
 
-**Noticias RSS (5 fuentes funcionales):**
+**Noticias RSS (5 fuentes funcionales, descargadas en paralelo):**
 - Federal Reserve (EE.UU. macro)
 - ECB (Eurozona)
 - Financial Times (global)
 - MarketWatch (mercados EE.UU.)
 - Investing.com (forex, commodities)
 
-**Noticias Chile (scraping):**
-- La Tercera Pulso: negocios y economia chilena
+**Noticias Chile:**
+- La Tercera Pulso: negocios y economia chilena. Se lee desde su RSS oficial
+  (Arc Publishing, con fecha de publicacion real); el scraping del HTML del
+  canal queda solo como respaldo si el RSS no entrega notas.
 
 ## IA y Ollama Cloud
 
@@ -460,8 +467,9 @@ No se realiza push automatico desde este proyecto.
 - [x] RSS feeds depurados (5 fuentes funcionales).
 - [x] Configuracion ruff y pytest.
 - [ ] Integracion mindicador.cl (indicadores secundarios).
-- [ ] Agregar retry logic y circuit breaker a fuentes externas.
+- [x] Agregar retry logic y circuit breaker a fuentes externas.
 - [ ] Calendario economico con proveedor estable.
+- [x] yfinance: series de 1 mes y sparklines en el correo.
 - [ ] Mejor deduplicacion semantica de noticias.
 - [ ] PostgreSQL opcional para despliegue compartido.
 - [ ] CI con pytest y ruff.

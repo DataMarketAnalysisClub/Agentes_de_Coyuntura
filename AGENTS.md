@@ -40,6 +40,23 @@ Este repositorio implementa `dmac-market-brief-agent` para el Data Market Analys
 - Usar `ruff` para estilo cuando se agregue CI.
 - Antes de commitear, revisar `git status`, `git diff` y tests relevantes.
 
+## Graficos guiados por noticias ("En foco")
+
+Concepto: los graficos del correo se eligen segun las noticias que el correo
+publica, no desde un catalogo fijo. Si un titular habla de cobre y del peso
+chileno, la seccion "En foco" muestra la serie de 1 mes del Cobre y del
+USD/CLP, y cada grafico cita el titular que lo activo.
+
+- Seleccion: `services/news_charts.py` (`select_news_charts`). Deterministica
+  y auditable: palabras clave por activo con limites de palabra, ponderadas
+  por titulo/resumen, impacto de la noticia y posicion del titular. Sin
+  palabras genericas ("mercados", "commodities").
+- Render: `services/email_charts.py` (`render_news_charts_section`), HTML/CSS
+  sin imagenes, igual que las sparklines.
+- Si ninguna noticia menciona un activo con historia, la seccion no aparece.
+- Para agregar un activo graficable: sumarlo a `DEFAULT_ASSETS` (yfinance) y
+  sus terminos a `ASSET_NEWS_KEYWORDS`, con un test de falso positivo.
+
 ## MVP: visualizaciones IA
 
 Para el MVP, las visualizaciones IA (Plotly + PNG via base64 o cid) **NO** se

@@ -12,7 +12,8 @@ El email es un multipart/alternative con dos partes:
 2. `text/html`: version con branding DMAC, generada por
    `services.email_formatter.build_email_html`
 
-Tamano tipico del HTML: 60-80 KB (sin imagenes IA embebidas en MVP).
+Tamano tipico del HTML: 70-90 KB con sparklines (sin imagenes IA embebidas
+en MVP). Gmail recorta el mensaje sobre ~102 KB.
 
 ## Orden de secciones en el HTML
 
@@ -25,10 +26,13 @@ Tamano tipico del HTML: 60-80 KB (sin imagenes IA embebidas en MVP).
    - A vigilar (bullets)
    - Cautelas (bullets)
 3. **Sentimiento de mercado** (score 0-100, drivers, fuente)
-4. **Asset table** (estatica, JS-free): Activo | Precio | Var % | Fuente
+4. **Asset table** (estatica, JS-free): Activo | Precio | Var % | 1 mes
+   (sparkline; si no hay historia de precios, la ultima columna es "Fuente")
 5. **Titulares por region** (barras horizontales estaticas)
 6. **Titulares principales** (lista ejecutiva con links a la fuente y region)
-7. **Footer** (disclaimer, "Nix Assistant, DMAC UDD", copyright)
+7. **En foco: activos en las noticias** (solo si algun titular menciona un
+   activo; ver abajo)
+8. **Footer** (disclaimer, "Nix Assistant, DMAC UDD", copyright)
 
 Las secciones deterministicas de `summarizer.py` (Resumen ejecutivo, Chile,
 Latam, EE.UU., Internacional, Que mirar hoy, Lectura DMAC) **NO se renderizan**
@@ -50,7 +54,8 @@ en `build_email_html` cuando hay IA.
 4. Asset table
 5. Titulares por region
 6. Titulares principales
-7. Footer
+7. En foco (si aplica)
+8. Footer
 
 ## Comportamiento por cliente de email
 
@@ -60,6 +65,7 @@ en `build_email_html` cuando hay IA.
 | Outlook mobile (Android/iOS) | OK, todo se ve |
 | Gmail web | OK (no probado con IA real, fallback OK) |
 | Apple Mail | Deberia funcionar (no probado) |
+| Telefonos angostos (<= 375 px) | La tabla de activos (4 columnas) no cabe y obliga a scroll horizontal; ya pasaba antes de las sparklines. Desde ~390 px cabe |
 | Clientes antiguos (Outlook 2016, Lotus Notes) | Las barras estaticas funcionan; el badge DMAC AI puede no verse con gradient |
 
 ## Visualizaciones en el email (MVP)
@@ -67,13 +73,39 @@ en `build_email_html` cuando hay IA.
 ### Estaticas (siempre presentes, JS-free)
 
 - **Asset table**: tabla HTML con `border: 1px solid`, `border-radius: 6px`
+- **Sparkline 1 mes** (`render_sparkline`): mini grafico de columnas con los
+  ~20 ultimos cierres diarios de yfinance, dentro de la tabla de activos.
+  Cada barra es una celda vacia con `border-bottom` del alto de la barra
+  (los bordes se respetan hasta en Outlook de escritorio; no hay imagenes).
+  Verde/rojo segun la variacion del mes (la columna "Var %" es la del dia).
+  Tooltip y `aria-label` con minimo, maximo y variacion del periodo.
+  Costo: ~1.3 KB por activo (~22 KB para 17 activos). Correo tipico con
+  sparklines: ~70 KB; Gmail recorta sobre ~102 KB, asi que no agregar mas
+  puntos ni activos sin medir el tamano.
 - **Sentimiento de mercado**: barra 0-100 con drivers principales desde
-  `yfinance` y Google Finance cuando esta disponible
+  `yfinance`
 - **Titulares por region bars**: divs con `width: N%` por cantidad de titulares
 - Renderizadas por `services/email_charts.py`
 
 Estas funcionan en TODOS los clientes de email sin problemas, incluyendo
 Outlook mobile, Outlook web, Gmail, Apple Mail.
+
+### En foco: graficos guiados por noticias
+
+Despues de los titulares, hasta 3 tarjetas (una por activo) con un grafico
+de columnas de 1 mes a todo el ancho, precio, variacion del dia, variacion
+del periodo, minimo/maximo y el titular que lo activo ("Por la noticia:",
+con link a la fuente).
+
+- Que activo aparece lo decide `services/news_charts.py` a partir de los
+  mismos titulares que muestra el correo (y que analiza Nix), no la IA:
+  cada grafico se puede explicar por un titular concreto.
+- Ejemplos: "Dolar anota maximos..." -> USD/CLP; "Sindicatos de Minera
+  Centinela aprueban huelga" -> Cobre; "Bond sell-off deepens and oil
+  rises" -> Brent y Treasury 10Y. "Dolar" en castellano es USD/CLP y
+  "dollar" en ingles es el DXY; "bonos" en castellano no activa el Treasury.
+- Si ningun titular menciona un activo graficable, la seccion no aparece.
+- Costo: ~2 KB por tarjeta.
 
 ### IA-sugeridas (DESHABILITADAS en MVP)
 

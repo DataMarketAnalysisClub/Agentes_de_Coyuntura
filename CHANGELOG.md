@@ -1,5 +1,159 @@
 # Changelog
 
+## [0.14.0] - 2026-09-22
+
+Primera pasada de fixes tras varios meses de marcha blanca en servidor propio.
+
+### Eliminado
+- Google Finance se retira por completo del pipeline (decision del club):
+  se borran `data_sources/google_finance_client.py` y
+  `tests/test_google_finance_client.py`.
+  - `services/market_sentiment.py`: `build_market_sentiment` ya no recibe
+    `google_items`; el sentimiento de mercado se calcula solo con snapshots
+    de yfinance/BCCh.
+  - `services/market_snapshot.py`: el fallback de mercado ya no usa
+    `GoogleFinanceQuoteClient`; por ahora cae a `NoopMarketClient` (sin
+    proveedor de respaldo). yfinance pasa a ser la unica fuente de precios.
+- Codigo y paquetes muertos:
+  - `data_sources/alpha_vantage_client.py`, `data_sources/fred_client.py` y
+    `data_sources/economic_calendar_client.py` (placeholders nunca importados).
+  - Settings `FRED_API_KEY` y `ALPHA_VANTAGE_API_KEY` (solo los usaban esos
+    placeholders) y sus entradas en `.env.example`/`.env.production.example`.
+    Un `.env` existente que las tenga sigue funcionando (`extra="ignore"`).
+  - Dependencia `cachetools` (declarada, nunca importada).
+
+### Cambiado (yfinance mas resiliente)
+- `data_sources/yfinance_client.py`:
+  - Los logs de error ahora incluyen el mensaje real de la excepcion
+    (`str(exc)`), no solo el tipo. Antes era imposible diagnosticar a
+    distancia por que fallaba (429, JSON invalido, timeout, etc.).
+  - Soporte opcional a `curl_cffi` (impersonation de navegador) via sesion
+    inyectada a `yf.download`, mitigacion recomendada por el propio proyecto
+    yfinance para el bloqueo anti-bot de Yahoo. Si `curl_cffi` no esta
+    instalado, sigue funcionando igual que antes.
+  - Reintento con backoff (`max_retries_per_ticker`, default 2) en el
+    fallback ticker-por-ticker.
+  - `requirements.txt`/`pyproject.toml`: se relaja el pin de `yfinance==0.2.48`
+    (desactualizado, Yahoo cambio su API varias veces desde entonces) a
+    `yfinance>=0.2.48`; se agrega `curl_cffi` como dependencia.
+- `scripts/diagnose_market_data.py` (NUEVO): script standalone para correr en
+  el servidor y ver, ticker por ticker, cual falla y con que error real.
+
+### Correo: fixes de renderizado en clientes de escritorio
+- `services/email_formatter.py`:
+  - Se agrega `font-family: Arial, Helvetica, sans-serif` explicito (body,
+    tablas contenedoras y `<style>` en el head). No existia en ningun lado
+    del archivo, por lo que Outlook de escritorio caia al serif por defecto
+    (Times New Roman) en vez de la tipografia de marca.
+  - El header y la card "Analisis de Nix" usan `background: linear-gradient`
+    que Outlook de escritorio ignora sin fallback, dejando texto blanco
+    sobre fondo blanco/transparente (invisible). Se agrega `bgcolor` (atributo
+    HTML) como color solido de respaldo.
+  - `render_market_sentiment_section`: la fila "label vs score" usaba
+    `display: flex`, no soportado por el motor Word de Outlook de escritorio.
+    Se reemplaza por una tabla `role="presentation"` con dos celdas.
+
+### Rendimiento
+- `jobs/common.py`: `collect_market_and_news` corria mercado (yfinance +
+  BCCh), RSS y scraping de Chile en serie. Ahora corren en paralelo
+  (`ThreadPoolExecutor`, 3 llamadas HTTP independientes), acotando el tiempo
+  total a la fuente mas lenta en vez de la suma de las tres.
+
+### yfinance reparado + sparklines de 1 mes en el correo
+- `data_sources/yfinance_client.py`:
+  - Una sola descarga batch de 1 mes (`period="1mo"`) por intervalo, de la
+    que salen la cotizacion (ultimo cierre, variacion diaria) y la serie para
+    graficos (`Quote.history`, hasta 22 cierres). Medido: 18 activos en
+    ~2.5s (antes ~6.2s con `period="5d"`).
+  - IPSA: `^IPSA` ya no existe en Yahoo. Se usa `MXIPSAGC.SN` (Bolsa de
+    Santiago), que coincide con el nivel del S&P IPSA (11.137,23, -1,06% el
+    2026-09-28, igual a lo reportado por la prensa). Su historial diario en
+    Yahoo trae 1 dato, asi que se piden velas horarias (`interval="1h"`) y se
+    toma el ultimo cierre de cada dia. El IPSA vuelve a la tabla y al
+    sentimiento de mercado.
+  - Validacion antes de publicar: se descartan velas con cierre fuera de
+    [minimo, maximo]; si son mas del 25% se descarta la serie completa
+    (`PEN=X`: 16 de 23 velas inconsistentes, ahora "s/d" en vez de un precio
+    erroneo). Series con ultimo cierre de hace mas de 7 dias se descartan.
+  - Se deja de inyectar una sesion `curl_cffi` propia: yfinance >= 1.0 crea
+    la suya con impersonation de Chrome y pide no reemplazarla. Se activan
+    sus reintentos nativos para errores transitorios de red.
+  - Batch vacio ya no dispara el reintento ticker por ticker (hasta 36
+    requests extra justo cuando Yahoo limita); solo se reintenta por ticker
+    si el batch lanza una excepcion. Vuelve a pasar
+    `test_yfinance_client_does_not_retry_every_symbol_when_batch_is_empty`.
+- `requirements.txt`/`pyproject.toml`: `yfinance==1.7.0` (probada en vivo y
+  con los pins en Python 3.11); se quita `curl_cffi` explicito (lo instala
+  yfinance).
+- `storage/models.py`: `MarketSnapshot.history` (solo en memoria, no se
+  guarda en SQLite); `services/market_snapshot.py` lo propaga.
+- `services/email_charts.py`: `render_sparkline` y columna "1 mes" en la
+  tabla de activos (HTML/CSS sin imagenes; ver `docs/email-output.md`). La
+  fuente pasa a la linea secundaria del activo para no sumar una quinta
+  columna.
+- `scripts/diagnose_market_data.py`: informa version de curl_cffi, intervalo
+  y cantidad de cierres por ticker.
+
+### Graficos guiados por noticias ("En foco")
+- Nuevo concepto de graficos del correo: se eligen segun los titulares
+  publicados. Si una noticia habla de cobre y del peso chileno, aparecen los
+  graficos de 1 mes del Cobre y del USD/CLP, citando el titular que los
+  activo.
+- `services/news_charts.py` (NUEVO): `assets_mentioned` y
+  `select_news_charts`. Palabras clave por activo con limites de palabra
+  (sin "oil" en "turmoil" ni "oro" en "tesoro"), ponderadas por titulo vs
+  resumen, impacto y posicion; maximo 3 graficos.
+- `services/email_charts.py`: `render_news_charts_section`, tarjetas HTML/CSS
+  sin imagenes. `render_sparkline` y la nueva seccion comparten el mismo
+  grafico de columnas.
+- `services/email_formatter.py`: `build_email_html` agrega la seccion despues
+  de los titulares (`max_news_charts`, default 3). Aplica al morning brief y
+  al market close sin cambios en los jobs.
+- Tests: `tests/test_news_charts.py`.
+
+### Scraping de noticias (optimizacion)
+- `app/http_client.py` (`ResilientHttpClient`):
+  - Llama `raise_for_status()` dentro del circuit breaker. Antes un 4xx/5xx
+    se trataba como exito: el 5xx no se reintentaba, el breaker no lo
+    contaba y el llamador parseaba la pagina de error como contenido.
+    Afecta tambien a Ollama Cloud: un 5xx ahora se reintenta segun
+    `OLLAMA_MAX_RETRIES`.
+  - Reutiliza un `httpx.Client` por instancia (pool de conexiones) en vez de
+    abrir uno por request, y envia un User-Agent propio.
+- `data_sources/rss_news_client.py`:
+  - Los feeds se descargan en paralelo, con un circuit breaker por host.
+    `pybreaker` mantiene un lock durante toda la llamada, asi que el breaker
+    global `"rss"` serializaba las descargas; ademas un feed caido podia
+    abrir el circuito de todos. Medido: ~2.9s -> ~0.7s (en frio).
+  - Se elimina el reintento via `feedparser.parse(url)`, que descargaba de
+    nuevo sin timeout ni breaker y duplicaba la espera en feeds caidos.
+  - Fechas: se usan `published_parsed`/`updated_parsed` de feedparser.
+    Investing.com publica fechas no RFC 822 ("2026-09-28 19:32:38") que
+    antes caian a "ahora", por lo que sus 10 notas pasaban siempre el
+    filtro de recencia (y podian re-disparar alertas).
+  - Se limpian tags HTML y entidades de titulos y resumenes.
+- `data_sources/chile_news_client.py`: La Tercera Pulso se lee desde su RSS
+  oficial (~220 KB vs ~680 KB de HTML, fecha real, 20 notas en vez de 10).
+  El scraping HTML queda como respaldo; en el HTML, todas las notas quedaban
+  con timestamp "ahora", se podian duplicar por selectores solapados y la
+  fecha visible (hora Chile) se etiquetaba como UTC. Las tres cosas se
+  corrigen.
+- `jobs/common.py`: el filtro de recencia se aplica antes de deduplicar
+  (menos comparaciones O(n^2) y evita perder una nota reciente porque su
+  duplicado antiguo llego primero). El conteo de "high impact" usa
+  `HIGH_IMPACT_THRESHOLD` en vez de un 8 fijo.
+- Tests nuevos: `tests/test_rss_news_client.py`; se actualiza
+  `tests/test_chile_news_client.py`.
+
+### Pendiente / siguiente iteracion
+- Calidad del analisis editorial IA (seleccion de noticias, profundidad por
+  region, contexto chileno): revision de prompts en curso, no incluida en
+  esta entrada.
+- Reducir la latencia del paso IA (~176s documentado en 0.11.0) sigue
+  pendiente; el fix de esta entrada es solo sobre la recoleccion de datos.
+- USD/PEN sin fuente confiable en Yahoo y graficos IA (PNG) aun apagados:
+  ver `NEXT_STEPS.md`.
+
 ## [0.13.0] - 2026-06-20
 
 ### Email (IA-first redesign)
