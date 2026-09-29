@@ -17,10 +17,15 @@ dependencies = [
     "pybreaker==1.0.2",
     "pydantic==2.9.2",
     "pydantic-settings==2.6.1",
-    "pytest==8.3.3",
     "python-dotenv==1.0.1",
-    "ruff==0.7.1",
     "yfinance==1.7.0",
+]
+
+# Mantener sincronizado con requirements-dev.txt.
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.3",
+    "ruff==0.7.1",
 ]
 
 [tool.ruff]

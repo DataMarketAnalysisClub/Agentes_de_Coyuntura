@@ -9,10 +9,8 @@ plotly==5.24.1
 pybreaker==1.0.2
 pydantic==2.9.2
 pydantic-settings==2.6.1
-pytest==8.3.3
 python-dotenv==1.0.1
-ruff==0.7.1
-# Version probada en vivo el 2026-09-28 (17/18 activos, ver NEXT_STEPS.md).
+# Version probada en vivo el 2026-09-28 (17/17 activos, ver NEXT_STEPS.md).
 # yfinance >= 1.0 instala curl_cffi (impersonation de navegador) por su cuenta.
 # Yahoo rompe yfinance con frecuencia: al actualizar, correr
 # `python -m scripts.diagnose_market_data` antes de fijar la nueva version.

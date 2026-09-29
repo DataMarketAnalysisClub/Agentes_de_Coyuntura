@@ -1,0 +1,4 @@
+# Dependencias de desarrollo y CI. La imagen Docker instala solo requirements.txt.
+-r requirements.txt
+pytest==8.3.3
+ruff==0.7.1
