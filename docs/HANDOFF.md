@@ -44,6 +44,23 @@ y el BCE y ninguna nota chilena. Decisiones del usuario: cupo chileno 1 de 3
 BCE. Ademas: DF con tier 2 (bug) y region por defecto "Chile" para medios
 chilenos (salvo DF Internacional).
 
+## Despliegue a produccion (2026-09-29, 11:30 hora de Chile)
+
+- Servidor: `bruno@nixbox` (Tailscale), `/opt/dmac-market-brief-agent`, sin
+  git: se despliega con `scripts/deploy.sh` (rama `chore/deploy-script`).
+  Acceso de Claude: llave `~/.ssh/id_ed25519` (con passphrase) autorizada en
+  el servidor, desbloqueada en un `ssh-agent` temporal
+  (`SSH_AUTH_SOCK=/run/user/1000/ssh-claude.sock`, expira a las 8 h).
+- Hasta hoy corria el codigo de **junio** (0.1.0, yfinance 0.2.48): nunca
+  se habia desplegado la v0.14 ni lo posterior. Desplegado `main` = 925bddc.
+- Respaldo previo: `~/backups/dmac-20260929-pre-v0.14.tgz` en el servidor.
+- Incidente breve: el primer sync excluyo `storage/` completo (tiene codigo),
+  el contenedor entro en loop de reinicio ~2 min; corregido sin perder
+  envios (no habia jobs hasta las 18:30). El script ya lo evita.
+- Verificado en produccion: yfinance 17/17, BCCh (TPM 4.5, IPC 0.6,
+  desempleo 9.53, USD/PEN 3.44 con 22 dias), DF 17 y La Tercera 20 notas,
+  28/28 fuentes ok, preview del correo 49.7 KB, `OPS_EMAIL_TO=brcarom@udd.cl`.
+
 ## Decisiones del usuario (no re-discutir sin motivo)
 
 - `OPS_EMAIL_TO` lo configura el usuario en el `.env` del servidor.

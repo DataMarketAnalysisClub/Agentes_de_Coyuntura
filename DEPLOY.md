@@ -38,23 +38,26 @@ exit
 
 ## Paso 3: Subir archivos via rsync
 
-Desde tu maquina local:
+Desde tu maquina local, con el repo en el commit a desplegar:
 
 ```bash
-cd /path/to/dmac-market-brief-agent
-rsync -avz --delete \
-  --exclude='.venv' \
-  --exclude='__pycache__' \
-  --exclude='.pytest_cache' \
-  --exclude='.ruff_cache' \
-  --exclude='outputs' \
-  --exclude='storage/*.db' \
-  --exclude='.git' \
-  ./ usuario@servidor:/opt/dmac-market-brief-agent/
+DEPLOY_HOST=usuario@servidor scripts/deploy.sh           # simulacion: lista los cambios
+DEPLOY_HOST=usuario@servidor scripts/deploy.sh --apply   # respaldo + sync + rebuild + verificacion
 ```
 
-`rsync` re-instala dependencias (Docker las maneja) y copia el codigo fuente
-+ archivos de configuracion. La primera vez tarda ~1 min.
+El script sube `git archive` del ref (`DEPLOY_REF`, por defecto `main`):
+solo codigo commiteado. Hace `rsync --delete` pero **nunca** toca `.env`,
+`storage/*.db`, `credentials/`, `outputs/` ni `logs/`.
+
+> **No usar un `rsync --delete` a mano sin esas exclusiones.** Desde un
+> checkout local sin `.env` borraria el `.env` y las credenciales del
+> servidor. Y no excluir la carpeta `storage/` completa: ademas de la base
+> contiene codigo (`repositories.py`, `models.py`, `database.py`); si queda
+> desactualizado el contenedor entra en loop de reinicio (paso el
+> 2026-09-29).
+
+La primera vez (sin `.env` en el servidor) el rebuild falla hasta completar
+el Paso 4; despues vuelve a correr `scripts/deploy.sh --apply`.
 
 ## Paso 4: Configurar `.env` y credenciales
 
@@ -200,21 +203,17 @@ para previsualizar.
 ## Actualizar el codigo en el futuro
 
 ```bash
-# Local
-git add -A && git commit -m "..." && git push
+# Local: integrar y publicar (merge a main y push)
+git checkout main && git merge --ff-only <rama> && git push origin main
 
-# Servidor
-ssh usuario@servidor
-cd /opt/dmac-market-brief-agent
-rsync -avz --delete \
-  --exclude='.venv' --exclude='__pycache__' \
-  --exclude='.pytest_cache' --exclude='.ruff_cache' \
-  --exclude='outputs' --exclude='storage/*.db' \
-  --exclude='.git' \
-  usuario@<server>:/opt/dmac-market-brief-agent/  # o git pull
-sudo systemctl restart dmac-market-brief-agent
-# Docker rebuilda automaticamente si hubo cambios en Dockerfile/requirements.txt
+# Desplegar (desde local; el servidor no necesita git)
+scripts/deploy.sh            # revisar la simulacion
+scripts/deploy.sh --apply
 ```
+
+Cada despliegue deja un respaldo en `~/backups/dmac-<fecha>.tgz` del
+servidor y el commit desplegado en `/opt/dmac-market-brief-agent/DEPLOYED_COMMIT`.
+Rollback: restaurar ese tar y `docker compose up -d --build`.
 
 ## Persistencia y backups
 
