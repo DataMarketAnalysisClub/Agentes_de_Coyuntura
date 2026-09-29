@@ -2,13 +2,22 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 
 from app.http_client import CircuitBreakerError, ResilientHttpClient
-from data_sources.rss_news_client import RawNewsItem
+from data_sources.rss_news_client import RawNewsItem, parse_feed
 
 logger = logging.getLogger(__name__)
 
 SCRAPE_TIMEOUT_SECONDS = 15.0
+CHILE_TZ = ZoneInfo("America/Santiago")
+
+LATERCERA_BASE_URL = "https://www.latercera.com"
+# Feed oficial (Arc Publishing) de la seccion Pulso: ~3x mas liviano que el
+# HTML del canal, trae fecha de publicacion real y ~30 notas en vez de 10.
+LATERCERA_PULSO_RSS_URL = f"{LATERCERA_BASE_URL}/arc/outboundfeeds/rss/category/pulso/?outputType=xml"
+LATERCERA_PULSO_HTML_URL = f"{LATERCERA_BASE_URL}/canal/pulso/"
+LATERCERA_MAX_ITEMS = 20
 
 
 class ChileNewsClient:
@@ -32,7 +41,7 @@ class ChileNewsClient:
     def fetch_latest(self) -> list[RawNewsItem]:
         items: list[RawNewsItem] = []
         sources = [
-            ("La Tercera Pulso", self._scrape_latercera_pulso),
+            ("La Tercera Pulso", self._fetch_latercera_pulso),
         ]
         for source_name, scraper in sources:
             try:
@@ -45,13 +54,34 @@ class ChileNewsClient:
                 logger.warning("Failed to scrape %s", source_name, exc_info=True)
         return items
 
+    def _fetch_latercera_pulso(self) -> list[RawNewsItem]:
+        """RSS primero; el scraping del HTML queda solo como respaldo."""
+        items = self._fetch_latercera_pulso_rss()
+        if items:
+            return items
+        logger.warning("La Tercera Pulso RSS returned no items, falling back to HTML scraping")
+        return self._scrape_latercera_pulso()
+
+    def _fetch_latercera_pulso_rss(self) -> list[RawNewsItem]:
+        try:
+            response = self._get_client().get(LATERCERA_PULSO_RSS_URL)
+            items = parse_feed(response.content, "La Tercera Pulso")
+        except CircuitBreakerError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch La Tercera Pulso RSS",
+                extra={"error_type": type(exc).__name__, "error": str(exc)},
+            )
+            return []
+        return [item for item in items if "/pulso/" in item.url][:LATERCERA_MAX_ITEMS]
+
     def _scrape_latercera_pulso(self) -> list[RawNewsItem]:
-        base_url = "https://www.latercera.com"
         items: list[RawNewsItem] = []
 
         try:
             client = self._get_client()
-            response = client.get(f"{base_url}/canal/pulso/")
+            response = client.get(LATERCERA_PULSO_HTML_URL)
             response.raise_for_status()
         except Exception:
             logger.warning("Failed to fetch La Tercera Pulso page")
@@ -81,6 +111,7 @@ class ChileNewsClient:
         from bs4 import BeautifulSoup
 
         results: list[tuple[str, str, str, datetime]] = []
+        seen_urls: set[str] = set()
         soup = BeautifulSoup(html, "lxml")
 
         for article in soup.select("article, .story-card, .c-post"):
@@ -99,8 +130,11 @@ class ChileNewsClient:
 
             timestamp = self._extract_latercera_timestamp(article)
 
-            if title:
-                full_url = urljoin("https://www.latercera.com", href)
+            full_url = urljoin(LATERCERA_BASE_URL, href)
+            # Los selectores se solapan (un <article> puede contener un
+            # .story-card), asi que la misma nota puede aparecer dos veces.
+            if title and full_url not in seen_urls:
+                seen_urls.add(full_url)
                 results.append((full_url, title, summary, timestamp))
 
         return results
@@ -126,7 +160,8 @@ class ChileNewsClient:
             if date_str:
                 try:
                     dt = datetime.strptime(date_str, "%d/%m/%Y %H:%M")
-                    return dt.replace(tzinfo=UTC)
+                    # La fecha visible del sitio esta en hora de Chile, no UTC.
+                    return dt.replace(tzinfo=CHILE_TZ).astimezone(UTC)
                 except ValueError:
                     pass
 

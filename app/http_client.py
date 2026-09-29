@@ -12,6 +12,12 @@ DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_RETRIES = 3
 CIRCUIT_BREAKER_FAIL_MAX = 5
 CIRCUIT_BREAKER_RESET_TIMEOUT = 60
+# Algunos sitios (medios, RSS) responden distinto o bloquean al UA por defecto
+# "python-httpx/x.y". Nos identificamos de forma honesta como bot del club.
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; dmac-market-brief-agent/0.14)",
+    "Accept-Language": "es-CL,es;q=0.9,en;q=0.8",
+}
 
 
 class CircuitBreakerError(Exception):
@@ -31,6 +37,13 @@ class ResilientHttpClient:
         self.timeout = timeout
         self.retries = retries
         self._breaker = self._get_breaker(name)
+        # Un solo httpx.Client por instancia (thread-safe) para reutilizar
+        # conexiones TCP/TLS entre requests al mismo host en vez de abrir una
+        # conexion nueva por request.
+        self._client = httpx.Client(timeout=timeout, follow_redirects=True, headers=DEFAULT_HEADERS)
+
+    def close(self) -> None:
+        self._client.close()
 
     @classmethod
     def _get_breaker(cls, name: str) -> pybreaker.CircuitBreaker:
@@ -120,9 +133,12 @@ class ResilientHttpClient:
     def _do_request(
         self, method: str, url: str, timeout: float, **kwargs: Any
     ) -> httpx.Response:
-        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
-            request_method = getattr(client, method.lower())
-            return request_method(url, **kwargs)
+        response = self._client.request(method, url, timeout=timeout, **kwargs)
+        # Sin esto, un 4xx/5xx se trataba como exito: no se reintentaba el 5xx,
+        # el circuit breaker no lo contaba y el llamador parseaba la pagina de
+        # error como si fuera contenido.
+        response.raise_for_status()
+        return response
 
 
 @lru_cache(maxsize=128)
