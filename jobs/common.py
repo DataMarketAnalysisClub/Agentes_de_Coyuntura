@@ -12,7 +12,7 @@ from services.impact_scoring import with_impact_scores
 from services.market_snapshot import MarketSnapshotService, expected_market_symbols
 from services.news_classifier import classify_news
 from services.source_health import SourceCheck, check_market_snapshots, check_news_sources
-from services.source_health_report import record_health
+from services.source_health_report import notify_transitions, record_health
 from storage.database import init_db
 from storage.models import MarketSnapshot, NewsItem
 from storage.repositories import MarketSnapshotRepository, NewsRepository
@@ -111,7 +111,8 @@ def _evaluate_health(
         checks = check_news_sources(raw_news, expected_sources, now) + check_market_snapshots(
             snapshots, expected_market_symbols(), {symbol: price for symbol, (price, _) in previous.items()}
         )
-        record_health(checks, now)
+        transitions = record_health(checks, now)
+        notify_transitions(transitions, checks)
     except Exception:
         logger.warning("Source health evaluation failed", exc_info=True)
         return []

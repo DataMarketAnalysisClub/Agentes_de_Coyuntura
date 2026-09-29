@@ -28,6 +28,7 @@ class EmailSender:
         html_body: str,
         enabled: bool,
         inline_images: dict[str, bytes] | None = None,
+        recipients: list[str] | None = None,
     ) -> bool:
         """Send the email via SMTP.
 
@@ -35,10 +36,15 @@ class EmailSender:
         HTML body must contain its images as inline base64 data URIs (handled
         by the email_formatter). This avoids the cid: multipart/related
         issues that break image rendering in Outlook mobile and Outlook web.
+
+        `recipients` overrides EMAIL_TO/EMAIL_CC (e.g. operational alerts that
+        must never reach the club mailing list).
         """
         del inline_images  # deprecated: HTML is self-contained now
-        to_list = self.settings.email_to_list
-        cc_list = self.settings.email_cc_list
+        if recipients is not None:
+            to_list, cc_list = list(recipients), []
+        else:
+            to_list, cc_list = self.settings.email_to_list, self.settings.email_cc_list
         recipients = [*to_list, *cc_list]
         recipients_text = ",".join(recipients)
 

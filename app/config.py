@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     email_to: str = ""
     email_cc: str = ""
     email_logo_path: str = "assets/Dmac_logo.png"
+    # Avisos de salud de fuentes para mantenedores (nunca a la lista del club).
+    # Vacio: los cambios de estado solo quedan en el log.
+    ops_email_to: str = ""
 
     bcentral_user: str = ""
     bcentral_password: str = ""
@@ -62,7 +65,7 @@ class Settings(BaseSettings):
     ollama_temperature: float = 0.2
     ollama_max_retries: int = 2
 
-    @field_validator("email_to", "email_cc", "rss_feeds", mode="before")
+    @field_validator("email_to", "email_cc", "ops_email_to", "rss_feeds", mode="before")
     @classmethod
     def _coerce_list_field(cls, value: object) -> object:
         if value is None or value == "":
@@ -82,6 +85,10 @@ class Settings(BaseSettings):
     @property
     def email_cc_list(self) -> list[str]:
         return self._split_csv(self.email_cc)
+
+    @property
+    def ops_email_to_list(self) -> list[str]:
+        return self._split_csv(self.ops_email_to)
 
     @property
     def rss_feeds_list(self) -> list[str]:

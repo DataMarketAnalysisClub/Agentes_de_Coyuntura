@@ -74,3 +74,63 @@ def test_last_valid_prices_skips_nulls_and_keeps_latest() -> None:
 
 def test_empty_table_message() -> None:
     assert "Sin registros" in format_health_table({})
+
+
+class FakeSender:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def send(self, subject, text_body, html_body, enabled, recipients=None) -> bool:
+        self.calls.append((subject, text_body, enabled, recipients))
+        return True
+
+
+def test_notify_transitions_sends_one_email_to_ops_only() -> None:
+    from services.source_health_report import Transition, notify_transitions
+
+    settings = Settings(ops_email_to="ops@example.com, dev@example.com", email_enabled=True)
+    transitions = [
+        Transition("Investing.com", SourceKind.NEWS, OK, DOWN, "sin notas"),
+        Transition("IPSA", SourceKind.MARKET, DOWN, OK),
+    ]
+    checks = [_check("Investing.com", DOWN, "sin notas"), _check("IPSA", OK)]
+    sender = FakeSender()
+
+    assert notify_transitions(transitions, checks, settings, sender)
+
+    [(subject, body, enabled, recipients)] = sender.calls
+    assert subject == "DMAC | Salud de fuentes: 1 con problemas, 1 recuperada(s)"
+    assert "* Investing.com (noticias): caida. sin notas" in body
+    assert "2. Fuentes recuperadas\n* IPSA (mercado)" in body
+    assert enabled is True
+    assert recipients == ["ops@example.com", "dev@example.com"]
+
+
+def test_notify_transitions_without_ops_recipients_or_changes_sends_nothing() -> None:
+    from services.source_health_report import Transition, notify_transitions
+
+    sender = FakeSender()
+    transition = Transition("FT", SourceKind.NEWS, OK, DOWN)
+
+    assert not notify_transitions([transition], [], Settings(ops_email_to=""), sender)
+    assert not notify_transitions([], [], Settings(ops_email_to="ops@example.com"), sender)
+    assert sender.calls == []
+
+
+def test_feed_down_two_runs_in_a_row_triggers_exactly_one_alert(monkeypatch) -> None:
+    import jobs.common as common
+    from data_sources.rss_news_client import RawNewsItem
+
+    notified = []
+    monkeypatch.setattr(common, "notify_transitions", lambda transitions, checks: notified.append(transitions))
+    monkeypatch.setattr(common, "expected_market_symbols", lambda: ["SP500"])
+    snapshots = [MarketSnapshot(datetime.now(UTC), "SP500", "S&P 500", 7400.0, 0.1, "yfinance")]
+    raw = [RawNewsItem(datetime.now(UTC), "FT", "t", "https://x", "")]
+
+    for _ in range(3):
+        checks = common._evaluate_health(raw, ["FT", "Investing.com"], snapshots)
+
+    assert {c.source: str(c.status) for c in checks} == {"FT": "ok", "Investing.com": "caida", "SP500": "ok"}
+    alerts = [transitions for transitions in notified if transitions]
+    assert len(alerts) == 1
+    assert [(t.source, str(t.current)) for t in alerts[0]] == [("Investing.com", "caida")]
