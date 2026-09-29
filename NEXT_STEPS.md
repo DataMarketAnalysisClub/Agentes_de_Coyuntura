@@ -123,6 +123,16 @@ ningun lado. Los pins `lxml==5.3.0` y `pydantic==2.9.2` no compilan en
 Python 3.14 (Docker usa 3.11, asi que produccion no se ve afectada, pero si
 un entorno local nuevo).
 
+## Correo y datos: hallazgos del 2026-09-29
+
+1. **Brent -8.46% en el dia con +6.5% en el mes**: probable cambio de
+   contrato de `BZ=F` a fin de mes en Yahoo; revisar tambien `CL=F`, `HG=F`,
+   `GC=F`. La salud de fuentes no lo detecta (umbral de salto 25%).
+2. **Router de temas IA**: respuesta vacia intermitente para una region
+   (`Strict JSON parse failed ... char 0`); el pipeline continua sin ella.
+3. **Correo**: sin scroll desde ~340 px; a 320 px desborda ~22 px. Validar en
+   clientes reales (Outlook PC, Gmail, telefonos) con el correo "[PRUEBA]".
+
 ## CI/CD
 
 - Hecho: GitHub Actions (`.github/workflows/ci.yml`) corre `ruff check` y
