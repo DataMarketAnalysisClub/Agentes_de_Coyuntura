@@ -370,6 +370,7 @@ def build_email_html(
     nix_chart_pngs: dict[str, bytes] | None = None,
     include_deterministic_brief: bool = True,
     market_sentiment=None,
+    max_news_charts: int = 3,
 ) -> str:
     """Build a professional HTML email from text body, snapshots, and AI analysis.
 
@@ -384,8 +385,12 @@ def build_email_html(
         render_assets_table as _render_assets_table,
     )
     from services.email_charts import (
+        render_news_charts_section as _render_news_charts_section,
+    )
+    from services.email_charts import (
         render_news_distribution_bars as _render_news_distribution_bars,
     )
+    from services.news_charts import select_news_charts
 
     blocks = _render_blocks(text_body)
     intro_lines: list[str] = []
@@ -425,6 +430,14 @@ def build_email_html(
         news_html = render_news_list(news_title, news_items, logo_path=logo_path)
         if news_html:
             section_rows.append(news_html)
+        # Graficos elegidos por los titulares (ver services/news_charts.py):
+        # van justo despues de la lista para leer noticia -> activo.
+        if include_charts and snapshots:
+            focus_html = _render_news_charts_section(
+                select_news_charts(news_items, snapshots, max_charts=max_news_charts)
+            )
+            if focus_html:
+                section_rows.append(focus_html)
 
     body_html = "".join(section_rows) or (
         f"<tr><td style=\"padding: 24px; color: {DMAC_MUTED};\">"

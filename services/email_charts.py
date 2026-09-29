@@ -16,11 +16,14 @@ from services.email_formatter import (
     DMAC_BRAND_PRIMARY,
     DMAC_BRAND_PRIMARY_DARK,
     DMAC_CARD,
+    DMAC_LINK,
     DMAC_MUTED,
     DMAC_TEXT,
     _color_for_change,
     _format_price,
+    _normalize_url,
 )
+from services.news_charts import NewsChart
 from storage.models import MarketSnapshot
 
 _MAX_BAR_WIDTH = 100
@@ -135,6 +138,72 @@ def _column_chart(
         f' border="0" style="width:{width};border-collapse:separate;">'
         f'<tr valign="bottom" style="height:{height_px}px;">{"".join(cells)}</tr></table>'
     )
+
+
+_FOCUS_CHART_HEIGHT_PX = 56
+_FOCUS_MAX_HEADLINES = 2
+
+
+def render_news_charts_section(charts: list[NewsChart]) -> str:
+    """Seccion "En foco": un grafico de 1 mes por activo mencionado en las noticias.
+
+    Cada tarjeta muestra precio, variacion del dia y del periodo, y el o los
+    titulares que activaron el grafico (con link a la fuente).
+    """
+    cards: list[str] = []
+    for chart in charts:
+        snap = chart.snapshot
+        chart_html = _column_chart(snap.history, width="100%", height_px=_FOCUS_CHART_HEIGHT_PX, spacing=2)
+        if not chart_html:
+            continue
+        day_change = "s/d" if snap.change_pct is None else f"{snap.change_pct:+.2f}%"
+        period = chart.period_change_pct
+        period_text = "" if period is None else f" &middot; {len(snap.history)} cierres: {period:+.1f}%"
+        low, high = min(snap.history), max(snap.history)
+        headlines = "".join(_focus_headline(item) for item in chart.news[:_FOCUS_MAX_HEADLINES])
+        cards.append(
+            "<tr><td style=\"padding: 12px; border-bottom: 1px solid " + DMAC_BORDER + ";\">"
+            "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"width: 100%;\">"
+            "<tr>"
+            f"<td style=\"font-weight: 600; color: {DMAC_TEXT};\">{escape(snap.name or snap.symbol)}</td>"
+            f"<td style=\"text-align: right; color: {DMAC_TEXT};\">{_format_price(snap.price)} "
+            f"<span style=\"color: {_color_for_change(snap.change_pct)}; font-weight: 600;\">{day_change}</span></td>"
+            "</tr></table>"
+            f"<div style=\"font-size: 11px; color: {DMAC_MUTED}; margin: 2px 0 6px 0;\">"
+            f"{escape(snap.source or '-')}{period_text} &middot; min {low:,.2f} / max {high:,.2f}</div>"
+            f"{chart_html}"
+            f"<div style=\"font-size: 11px; color: {DMAC_MUTED}; margin-top: 6px;\">Por la noticia:</div>"
+            f"{headlines}"
+            "</td></tr>"
+        )
+
+    if not cards:
+        return ""
+
+    return (
+        "<tr><td style=\"padding: 20px 24px 0 24px;\">"
+        f"<h2 style=\"margin: 0 0 4px 0; font-size: 15px; color: {DMAC_BRAND_PRIMARY_DARK};"
+        " letter-spacing: 0.02em; text-transform: uppercase;\">En foco: activos en las noticias</h2>"
+        f"<div style=\"margin: 0 0 12px 0; font-size: 12px; color: {DMAC_MUTED};\">"
+        "Graficos elegidos segun los titulares de hoy. Ultimo mes de cierres diarios.</div>"
+        "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
+        f" style=\"width: 100%; border-collapse: collapse; background: {DMAC_CARD};"
+        f" border: 1px solid {DMAC_BORDER}; border-radius: 6px; overflow: hidden;\">"
+        f"{''.join(cards)}"
+        "</table></td></tr>"
+    )
+
+
+def _focus_headline(item) -> str:
+    url = _normalize_url(getattr(item, "url", "") or "")
+    title = escape(item.title)
+    source = escape(item.source or "")
+    if url:
+        title = (
+            f"<a href=\"{escape(url)}\" target=\"_blank\" rel=\"noopener noreferrer\""
+            f" style=\"color: {DMAC_LINK}; text-decoration: none;\">{title}</a>"
+        )
+    return f"<div style=\"font-size: 12px; margin-top: 2px;\">{title} <span style=\"color: {DMAC_MUTED};\">({source})</span></div>"
 
 
 def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
