@@ -9,27 +9,70 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from data_sources.rss_news_client import RawNewsItem
 from storage.models import NewsItem
 
+# Palabras clave normalizadas (minusculas, sin tildes). Se buscan como
+# palabras completas con plural opcional ("tasa" calza con "tasas", "rate" con
+# "rates", pero "rate" ya no calza con "corporate" ni "oil" con "turmoil").
+# Un "*" final marca un prefijo: "geopolit*" cubre geopolitica/geopolitical.
 REGION_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "Chile": ("chile", "bcch", "banco central de chile", "cmf", "ipc", "imacec", "hacienda"),
-    "Latam": ("latam", "brasil", "mexico", "colombia", "peru", "argentina", "bovespa"),
-    "EE.UU.": ("fed", "federal reserve", "united states", "eeuu", "u.s.", "us ", "bls", "bea"),
-    "Global": ("global", "world", "europe", "ecb", "imf", "china", "geopolit"),
+    "Chile": ("chile", "chilen*", "chilean", "bcch", "banco central de chile", "cmf", "ipc", "imacec", "hacienda"),
+    "Latam": (
+        "latam", "brasil", "brazil*", "mexic*", "colombi*", "peru", "peruan*", "peruvian", "argentin*", "bovespa",
+    ),
+    "EE.UU.": (
+        "fed", "federal reserve", "reserva federal", "fomc", "federal open market committee", "united states",
+        "estados unidos", "eeuu", "ee.uu", "u.s", "wall street", "bls", "bea",
+    ),
+    "Global": ("global", "world", "europe*", "ecb", "imf", "china", "chinese", "geopolit*"),
 }
 
 TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "tasas": ("tasa", "rate", "yield", "treasury"),
+    "tasas": ("tasa", "rate", "yield", "treasury", "treasuries"),
     "inflacion": ("ipc", "inflacion", "inflation", "cpi", "ppi"),
     "actividad": ("pib", "gdp", "imacec", "actividad", "growth"),
-    "empleo": ("empleo", "jobs", "payroll", "unemployment", "labor"),
+    "empleo": (
+        "empleo", "desempleo", "desocupacion", "laboral", "jobs", "payroll", "unemployment", "labor", "labour",
+    ),
     "commodities": ("cobre", "copper", "oil", "petroleo", "brent", "wti", "gold", "oro"),
-    "FX": ("dolar", "dollar", "fx", "currency", "peso"),
-    "renta variable": ("acciones", "equity", "stocks", "s&p", "nasdaq", "ipsa"),
+    "FX": ("dolar", "dollar", "fx", "currency", "currencies", "peso"),
+    "renta variable": ("acciones", "equity", "equities", "stock", "s&p", "nasdaq", "ipsa"),
     "politica fiscal": ("fiscal", "budget", "deuda", "hacienda", "treasury"),
-    "bancos centrales": ("fed", "ecb", "banco central", "central bank", "monetary"),
-    "geopolitica": ("war", "guerra", "geopolit", "sanction"),
+    "bancos centrales": (
+        "fed", "federal reserve", "reserva federal", "fomc", "federal open market committee", "ecb",
+        "banco central", "bancos centrales", "central bank", "monetary", "monetaria",
+    ),
+    "geopolitica": ("war", "guerra", "geopolit*", "sanction"),
     "regulacion financiera": ("cmf", "sec", "regulation", "regulacion", "banking"),
-    "empresas": ("earnings", "resultados", "company", "empresa"),
+    "empresas": ("earnings", "resultados", "company", "companies", "empresa"),
 }
+
+# Excepciones puntuales a la busqueda por palabra: el IPC de Mexico es un
+# indice bursatil, no el IPC chileno.
+_KEYWORD_PATTERN_OVERRIDES: dict[str, str] = {
+    "ipc": r"(?<![a-z0-9])(?<!mexico )ipc(?! (?:de )?mexico)(?![a-z0-9])",
+}
+
+
+def _keyword_pattern(keyword: str) -> str:
+    if keyword in _KEYWORD_PATTERN_OVERRIDES:
+        return _KEYWORD_PATTERN_OVERRIDES[keyword]
+    if keyword.endswith("*"):
+        return rf"(?<![a-z0-9]){re.escape(keyword[:-1])}"
+    # Plural opcional: "tasa" -> "tasas", "sanction" -> "sanctions".
+    return rf"(?<![a-z0-9]){re.escape(keyword)}(?:s|es)?(?![a-z0-9])"
+
+
+def _compile_keywords(keywords_by_label: dict[str, tuple[str, ...]]) -> dict[str, re.Pattern[str]]:
+    return {
+        label: re.compile("|".join(_keyword_pattern(keyword) for keyword in keywords))
+        for label, keywords in keywords_by_label.items()
+    }
+
+
+_REGION_PATTERNS = _compile_keywords(REGION_KEYWORDS)
+# "US" solo cuenta en mayusculas en el texto original ("US-Iran war", "US CDC"):
+# normalizado seria el pronombre "us". "US$" es la moneda, no la region.
+_US_UPPERCASE_PATTERN = re.compile(r"(?<![A-Za-z0-9])US(?![A-Za-z0-9$])")
+_TOPIC_PATTERNS = _compile_keywords(TOPIC_KEYWORDS)
 
 
 @lru_cache(maxsize=1024)
@@ -74,17 +117,18 @@ def normalize_title(value: str) -> str:
 
 
 def classify_region(title: str, summary: str = "") -> str:
-    text = normalize_text(f"{title} {summary}")
-    for region, keywords in REGION_KEYWORDS.items():
-        if any(keyword in text for keyword in keywords):
+    raw = f"{title} {summary}"
+    text = normalize_text(raw)
+    for region, pattern in _REGION_PATTERNS.items():
+        if pattern.search(text) or (region == "EE.UU." and _US_UPPERCASE_PATTERN.search(raw)):
             return region
     return "Global"
 
 
 def classify_topic(title: str, summary: str = "") -> str:
     text = normalize_text(f"{title} {summary}")
-    for topic, keywords in TOPIC_KEYWORDS.items():
-        if any(keyword in text for keyword in keywords):
+    for topic, pattern in _TOPIC_PATTERNS.items():
+        if pattern.search(text):
             return topic
     return "macro general"
 
