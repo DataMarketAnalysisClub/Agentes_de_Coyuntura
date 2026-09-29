@@ -52,6 +52,7 @@ class MarketSnapshotService:
                     price=quote.price,
                     change_pct=quote.change_pct,
                     source=quote.source,
+                    history=quote.history,
                 )
             )
 

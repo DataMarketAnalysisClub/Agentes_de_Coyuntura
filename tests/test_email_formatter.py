@@ -160,3 +160,46 @@ def test_build_email_html_includes_market_sentiment_section() -> None:
     assert "Riesgo positivo" in html
     assert "72/100" in html
     assert "Google Finance" in html
+
+
+def test_assets_table_renders_sparkline_when_history_available() -> None:
+    from datetime import UTC, datetime
+
+    from services.email_charts import render_assets_table
+    from storage.models import MarketSnapshot
+
+    now = datetime.now(UTC)
+    html = render_assets_table([
+        MarketSnapshot(now, "USDCLP", "USD/CLP", 965.7, 0.48, "yfinance", history=(950.0, 955.0, 960.0, 958.0, 965.7)),
+        MarketSnapshot(now, "TPM", "TPM Chile", 4.75, None, "bcentral"),
+    ])
+
+    assert "1 mes" in html
+    assert "Fuente</th>" not in html
+    assert "USDCLP &middot; yfinance" in html
+    assert 'role="img"' in html
+    assert html.count('<td style="border-bottom:') == 5
+
+
+def test_assets_table_keeps_source_column_without_history() -> None:
+    from datetime import UTC, datetime
+
+    from services.email_charts import render_assets_table
+    from storage.models import MarketSnapshot
+
+    now = datetime.now(UTC)
+    html = render_assets_table([MarketSnapshot(now, "USDCLP", "USD/CLP", 965.7, 0.48, "yfinance")])
+
+    assert "Fuente</th>" in html
+    assert 'role="img"' not in html
+
+
+def test_sparkline_scales_heights_and_skips_short_series() -> None:
+    from services.email_charts import render_sparkline
+
+    assert render_sparkline((1.0, 2.0)) == ""
+    html = render_sparkline((10.0, 20.0, 15.0, 10.0, 20.0))
+    assert "border-bottom:2px solid" in html  # minimo
+    assert "border-bottom:18px solid" in html  # maximo
+    flat = render_sparkline((5.0,) * 6)
+    assert flat.count("border-bottom:10px solid") == 6

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -10,6 +10,9 @@ class MarketSnapshot:
     price: float | None
     change_pct: float | None
     source: str
+    # Cierres diarios recientes (antiguo -> reciente) para graficos del correo.
+    # Solo en memoria: no se persiste en SQLite.
+    history: tuple[float, ...] = field(default=(), compare=False, repr=False)
 
 
 @dataclass(frozen=True)

@@ -90,21 +90,81 @@ def render_news_distribution_bars(
     )
 
 
+# Sparkline de 1 mes: mini grafico de columnas hecho solo con celdas de tabla
+# (sin imagenes ni JS). Cada barra es una celda vacia cuyo borde inferior
+# tiene el alto de la barra: los bordes se respetan incluso en el motor Word
+# de Outlook de escritorio, que ignora el alto de los <div>. Las imagenes
+# embebidas (cid: y base64) se veian rotas en Outlook mobile/web (ver
+# docs/email-output.md). Cuesta ~1 KB por activo: hay que cuidar el limite de
+# ~102 KB sobre el cual Gmail recorta el correo.
+_SPARK_MIN_POINTS = 5
+_SPARK_HEIGHT_PX = 18
+_SPARK_MIN_BAR_PX = 2
+_SPARK_WIDTH_PX = 60
+
+
+def render_sparkline(values: tuple[float, ...] | list[float]) -> str:
+    """Render a compact HTML/CSS column sparkline, or '' if there is too little data."""
+    return _column_chart(values, width=f"{_SPARK_WIDTH_PX}px", height_px=_SPARK_HEIGHT_PX, spacing=1)
+
+
+def _column_chart(
+    values: tuple[float, ...] | list[float],
+    *,
+    width: str,
+    height_px: int,
+    spacing: int,
+) -> str:
+    points = [float(v) for v in values if v is not None]
+    if len(points) < _SPARK_MIN_POINTS:
+        return ""
+
+    low, high = min(points), max(points)
+    span = high - low
+    color = _color_for_change(points[-1] - points[0])
+    usable = height_px - _SPARK_MIN_BAR_PX
+    cells = []
+    for value in points:
+        ratio = (value - low) / span if span > 0 else 0.5
+        height = _SPARK_MIN_BAR_PX + int(round(ratio * usable))
+        cells.append(f'<td style="border-bottom:{height}px solid {color}"></td>')
+    change = (points[-1] / points[0] - 1) * 100 if points[0] else 0.0
+    label = escape(f"{len(points)} cierres: min {low:,.2f} / max {high:,.2f} ({change:+.1f}%)")
+    return (
+        f'<table role="img" aria-label="{label}" title="{label}" cellspacing="{spacing}" cellpadding="0"'
+        f' border="0" style="width:{width};border-collapse:separate;">'
+        f'<tr valign="bottom" style="height:{height_px}px;">{"".join(cells)}</tr></table>'
+    )
+
+
 def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
-    """Render a styled HTML table of market snapshots (no Plotly)."""
+    """Render a styled HTML table of market snapshots (no Plotly).
+
+    Si hay historia de precios (yfinance), la columna "Fuente" se reemplaza por
+    una sparkline de 1 mes y la fuente pasa a la linea secundaria del activo,
+    para no agregar una quinta columna que desborde en pantallas de telefono.
+    """
     rows: list[tuple[str, str, str, str, str]] = []
+    with_trend = any(len(snap.history) >= _SPARK_MIN_POINTS for snap in snapshots)
     for snap in snapshots:
         if snap.price is None and snap.change_pct is None:
             continue
         price = _format_price(snap.price)
         change = "s/d" if snap.change_pct is None else f"{snap.change_pct:+.2f}%"
         change_color = _color_for_change(snap.change_pct)
+        source = escape(snap.source or "-")
+        symbol = escape(snap.symbol)
+        if with_trend:
+            symbol = f"{symbol} &middot; {source}"
+            last_cell = render_sparkline(snap.history) or "&nbsp;"
+        else:
+            last_cell = source
         rows.append((
             escape(snap.name or snap.symbol),
-            escape(snap.symbol),
+            symbol,
             price,
             f'<span style="color: {change_color}; font-weight: 600;">{change}</span>',
-            escape(snap.source or "-"),
+            last_cell,
         ))
 
     if not rows:
@@ -114,6 +174,7 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
             "</td></tr>"
         )
 
+    last_header = "1 mes" if with_trend else "Fuente"
     header = (
         "<tr style=\"background: " + DMAC_BG + ";\">"
         f"<th style=\"text-align: left; padding: 8px 12px; font-size: 11px; color: {DMAC_MUTED};"
@@ -127,10 +188,12 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
         f"{DMAC_BORDER};\">Var %</th>"
         f"<th style=\"text-align: left; padding: 8px 12px; font-size: 11px; color: {DMAC_MUTED};"
         " text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid "
-        f"{DMAC_BORDER};\">Fuente</th>"
+        f"{DMAC_BORDER};\">{last_header}</th>"
         "</tr>"
     )
 
+    # Con sparkline se recorta el padding para que la tabla quepa en ~360px.
+    last_padding = "8px 8px 8px 4px" if with_trend else "8px 12px"
     body_rows: list[str] = []
     for name, symbol, price, change_html, source in rows:
         body_rows.append(
@@ -142,7 +205,7 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
             f" color: {DMAC_TEXT};\">{price}</td>"
             f"<td style=\"padding: 8px 12px; text-align: right; border-bottom: 1px solid {DMAC_BORDER};\">"
             f"{change_html}</td>"
-            f"<td style=\"padding: 8px 12px; border-bottom: 1px solid {DMAC_BORDER};"
+            f"<td style=\"padding: {last_padding}; border-bottom: 1px solid {DMAC_BORDER};"
             f" color: {DMAC_MUTED}; font-size: 12px;\">{source}</td>"
             "</tr>"
         )

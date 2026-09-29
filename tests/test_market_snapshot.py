@@ -4,7 +4,7 @@ from services.market_snapshot import MarketSnapshotService
 
 class MockMarketClient:
     def fetch_quotes(self) -> list[Quote]:
-        return [Quote("USDCLP", "USD/CLP", 930.0, 0.5, "mock")]
+        return [Quote("USDCLP", "USD/CLP", 930.0, 0.5, "mock", history=(920.0, 925.0, 930.0))]
 
 
 class FailingMarketClient:
@@ -42,6 +42,8 @@ def test_market_snapshot_collects_mock_data() -> None:
     snapshots = service.collect()
 
     assert any(snapshot.symbol == "USDCLP" and snapshot.price == 930.0 for snapshot in snapshots)
+    usdclp = next(snapshot for snapshot in snapshots if snapshot.symbol == "USDCLP")
+    assert usdclp.history == (920.0, 925.0, 930.0)
     assert any(snapshot.symbol == "TPM" for snapshot in snapshots)
     assert any(snapshot.symbol == "IPC" for snapshot in snapshots)
 
