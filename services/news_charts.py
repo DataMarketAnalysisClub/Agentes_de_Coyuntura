@@ -85,6 +85,8 @@ class NewsChart:
     snapshot: MarketSnapshot
     news: tuple[NewsItem, ...]
     score: float = field(compare=False)
+    # Linea de lectura de Nix (IA), opcional: ver services/ai/news_chart_readings.py.
+    reading: str = field(default="", compare=False)
 
     @property
     def period_change_pct(self) -> float | None:

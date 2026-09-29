@@ -371,6 +371,7 @@ def build_email_html(
     include_deterministic_brief: bool = True,
     market_sentiment=None,
     max_news_charts: int = 3,
+    news_charts: list | None = None,
 ) -> str:
     """Build a professional HTML email from text body, snapshots, and AI analysis.
 
@@ -379,7 +380,9 @@ def build_email_html(
     dedicated 'Analisis de Nix' card at the TOP of the body (so it stands out
     from the deterministic data below). When `include_deterministic_brief` is
     False, the parsed "N. Title" sections from `text_body` are skipped (the
-    intro line is still extracted for the header).
+    intro line is still extracted for the header). `news_charts` lets the
+    caller pass the "En foco" charts already selected (e.g. with Nix readings);
+    if omitted they are selected here from `news_items`.
     """
     from services.email_charts import (
         render_assets_table as _render_assets_table,
@@ -433,9 +436,9 @@ def build_email_html(
         # Graficos elegidos por los titulares (ver services/news_charts.py):
         # van justo despues de la lista para leer noticia -> activo.
         if include_charts and snapshots:
-            focus_html = _render_news_charts_section(
-                select_news_charts(news_items, snapshots, max_charts=max_news_charts)
-            )
+            if news_charts is None:
+                news_charts = select_news_charts(news_items, snapshots, max_charts=max_news_charts)
+            focus_html = _render_news_charts_section(news_charts)
             if focus_html:
                 section_rows.append(focus_html)
 

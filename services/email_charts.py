@@ -161,6 +161,13 @@ def render_news_charts_section(charts: list[NewsChart]) -> str:
         period_text = "" if period is None else f" &middot; {len(snap.history)} cierres: {period:+.1f}%"
         low, high = min(snap.history), max(snap.history)
         headlines = "".join(_focus_headline(item) for item in chart.news[:_FOCUS_MAX_HEADLINES])
+        # La lectura es interpretacion de la IA: va rotulada y separada de los datos.
+        reading = (
+            f"<div style=\"font-size: 12px; color: {DMAC_TEXT}; margin-top: 6px;\">"
+            f"<strong style=\"color: {DMAC_BRAND_PRIMARY};\">Lectura de Nix (IA):</strong> {escape(chart.reading)}</div>"
+            if chart.reading
+            else ""
+        )
         cards.append(
             "<tr><td style=\"padding: 12px; border-bottom: 1px solid " + DMAC_BORDER + ";\">"
             "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"width: 100%;\">"
@@ -172,6 +179,7 @@ def render_news_charts_section(charts: list[NewsChart]) -> str:
             f"<div style=\"font-size: 11px; color: {DMAC_MUTED}; margin: 2px 0 6px 0;\">"
             f"{escape(snap.source or '-')}{period_text} &middot; min {low:,.2f} / max {high:,.2f}</div>"
             f"{chart_html}"
+            f"{reading}"
             f"<div style=\"font-size: 11px; color: {DMAC_MUTED}; margin-top: 6px;\">Por la noticia:</div>"
             f"{headlines}"
             "</td></tr>"

@@ -7,6 +7,7 @@ from pathlib import Path
 from app.config import get_settings
 from jobs.common import chile_now, collect_market_and_news, write_output_bundle
 from services.ai.editorial_pipeline import run_phase3_pipeline
+from services.ai.news_chart_readings import select_news_charts_with_readings
 from services.email_formatter import (
     DMAC_BG,
     DMAC_BRAND_PRIMARY,
@@ -148,6 +149,7 @@ def run_market_close() -> Brief:
     generated = generate_market_close(now.date(), snapshots, selected_news, market_sentiment)
     nix_analysis_html, nix_chart_pngs = _generate_nix_analysis(selected_news, snapshots, settings)
     nix_charts_inline = _build_nix_charts_cid_map(nix_chart_pngs)
+    news_charts = select_news_charts_with_readings(selected_news, snapshots, settings)
     html_body = build_email_html(
         generated.subject,
         generated.text_body,
@@ -161,6 +163,7 @@ def run_market_close() -> Brief:
         nix_chart_pngs=nix_charts_inline or None,
         include_deterministic_brief=not bool(nix_analysis_html),
         market_sentiment=market_sentiment,
+        news_charts=news_charts,
     )
     stem = f"market_close_{now:%Y%m%d_%H%M%S}"
     output_path = write_output_bundle(Path("outputs/briefs"), stem, generated.text_body, html_body)
