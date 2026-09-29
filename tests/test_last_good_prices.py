@@ -60,8 +60,8 @@ def test_labels_in_table_and_text_use_chile_date() -> None:
 def test_unavailable_sources_line_rendered_escaped() -> None:
     html = build_email_html("Asunto", "", unavailable_sources=["Investing.com", "USD/PEN", "<x>"])
 
-    assert "Sin datos en esta edicion: Investing.com, USD/PEN, &lt;x&gt;." in html
-    assert "Sin datos en esta edicion" not in build_email_html("Asunto", "")
+    assert "Sin datos en esta edición: Investing.com, USD/PEN, &lt;x&gt;." in html
+    assert "Sin datos en esta edición" not in build_email_html("Asunto", "")
 
 
 def test_display_names_cover_fx_and_macro() -> None:

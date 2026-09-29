@@ -7,7 +7,7 @@ from app.config import get_settings
 from jobs.common import chile_now, collect_market_and_news_with_health, write_output_bundle
 from services.ai.editorial_pipeline import run_phase3_pipeline
 from services.ai.news_chart_readings import select_news_charts_with_readings
-from services.email_formatter import build_email_html
+from services.email_formatter import build_email_html, render_nix_editorial
 from services.email_sender import EmailSender
 from services.market_sentiment import collect_market_sentiment
 from services.news_selection import select_executive_news
@@ -51,67 +51,7 @@ def _generate_nix_analysis(
         return "", {}
     if not result.editorial:
         return "", {}
-
-    from html import escape as _escape
-
-    from services.email_formatter import (
-        DMAC_BG,
-        DMAC_BRAND_PRIMARY,
-    )
-    email = result.editorial
-    parts: list[str] = []
-    if email.executive_summary:
-        items = "".join(
-            f"<li style=\"margin: 0 0 4px 0;\">{_escape(point)}</li>"
-            for point in email.executive_summary[:4]
-        )
-        parts.append(
-            f"<div style=\"margin: 0 0 10px 0;\"><strong style=\"color: {DMAC_BRAND_PRIMARY};\">"
-            "Resumen ejecutivo:</strong><ul style=\"margin: 6px 0 0 0; padding-left: 18px;\">"
-            f"{items}</ul></div>"
-        )
-    for section in email.sections:
-        if section.heading and section.heading.lower() in {"visualizaciones", "a vigilar", "fuentes", "cautelas editoriales"}:
-            continue
-        body_html = "".join(
-            f"<p style=\"margin: 0 0 8px 0; line-height: 1.5;\">{_escape(line)}</p>"
-            for line in section.body
-        )
-        bullets = "".join(
-            f"<li style=\"margin: 0 0 3px 0;\">{_escape(b)}</li>"
-            for b in section.bullets[:5]
-        )
-        section_html = (
-            f"<div style=\"margin: 0 0 12px 0;\">"
-            f"<h3 style=\"margin: 0 0 6px 0; font-size: 12px; color: {DMAC_BRAND_PRIMARY};"
-            f" text-transform: uppercase; letter-spacing: 0.04em;\">{_escape(section.heading)}</h3>"
-            f"{body_html}"
-        )
-        if bullets:
-            section_html += f"<ul style=\"margin: 4px 0 0 0; padding-left: 18px;\">{bullets}</ul>"
-        section_html += "</div>"
-        parts.append(section_html)
-    if email.risk_flags:
-        items = "".join(
-            f"<li style=\"margin: 0 0 4px 0;\">{_escape(flag)}</li>"
-            for flag in email.risk_flags[:5]
-        )
-        parts.append(
-            f"<div style=\"margin: 0 0 8px 0;\"><strong style=\"color: {DMAC_BRAND_PRIMARY};\">"
-            f"A vigilar:</strong><ul style=\"margin: 6px 0 0 0; padding-left: 18px;\">{items}</ul></div>"
-        )
-    if email.editorial_cautions:
-        items = "".join(
-            f"<li style=\"margin: 0 0 4px 0;\">{_escape(c)}</li>"
-            for c in email.editorial_cautions[:3]
-        )
-        parts.append(
-            f"<div style=\"margin: 8px 0 0 0; padding: 8px 10px; background: {DMAC_BG};"
-            f" border-left: 3px solid {DMAC_BRAND_PRIMARY}; font-size: 11px;\">"
-            f"<strong style=\"color: {DMAC_BRAND_PRIMARY};\">Cautelas:</strong>"
-            f"<ul style=\"margin: 4px 0 0 0; padding-left: 18px;\">{items}</ul></div>"
-        )
-    return "".join(parts) or "", result.chart_pngs
+    return render_nix_editorial(result.editorial), result.chart_pngs
 
 
 def _build_nix_charts_cid_map(chart_pngs: dict[str, bytes]) -> dict[str, bytes]:

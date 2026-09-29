@@ -40,7 +40,7 @@ def market_display_names(snapshots: list[MarketSnapshot] = ()) -> dict[str, str]
     """Nombre legible por simbolo esperado (para avisos al lector)."""
     names = {asset.symbol: asset.name for asset in DEFAULT_ASSETS}
     names.update({symbol: name for symbol, name, _ in BCENTRAL_FX_SERIES})
-    names.update({"TPM": "TPM Chile", "IPC": "IPC / Inflacion Chile", "DESEMPLEO": "Desempleo Chile"})
+    names.update({"TPM": "TPM Chile", "IPC": "IPC mensual Chile", "DESEMPLEO": "Desempleo Chile"})
     names.update({snapshot.symbol: snapshot.name for snapshot in snapshots if snapshot.name})
     return names
 
@@ -187,7 +187,7 @@ class MarketSnapshotService:
     def _collect_bcentral_indicators(self, timestamp: datetime) -> list[MarketSnapshot]:
         indicators = (
             ("TPM", "TPM Chile", self.bcentral_client.fetch_policy_rate),
-            ("IPC", "IPC / Inflacion Chile", self.bcentral_client.fetch_inflation),
+            ("IPC", "IPC mensual Chile", self.bcentral_client.fetch_inflation),
             ("DESEMPLEO", "Desempleo Chile", self.bcentral_client.fetch_unemployment),
         )
         with ThreadPoolExecutor(max_workers=len(indicators)) as executor:

@@ -103,7 +103,7 @@ class TestRenderNewsCharts:
         assert "Cobre" in html
         assert 'href="https://example.com/cobre"' in html
         assert html.count('<td style="border-bottom:') == len(HISTORY)
-        assert "+4.0%" in html  # variacion del periodo 100 -> 104
+        assert "+4,0%" in html  # variacion del periodo 100 -> 104
 
     def test_empty_selection_renders_nothing(self) -> None:
         assert render_news_charts_section([]) == ""

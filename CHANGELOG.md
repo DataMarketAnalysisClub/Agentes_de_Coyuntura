@@ -2,6 +2,27 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Cambiado (diseno "Editorial" del correo)
+- Nuevo look elegido en Claude Design (propuesta A): fondo marfil, titulares
+  en Georgia, cabecera tipo periodico con logo, fecha larga en espanol y
+  edicion ("Edicion de la manana/de cierre"); lineas finas entre secciones.
+- Orden: "Lo esencial" (Nix, con titular y resumen numerado; Chile antes que
+  Global), cifras clave (USD/CLP, Cobre, IPSA, TPM), sentimiento en una
+  linea, titulares, mercados agrupados (Chile, EE.UU., materias primas,
+  resto del mundo) y "En foco" en dos columnas.
+- Responsivo sin depender de `@media`: las grillas son columnas
+  `inline-block` que se apilan solas (2x2 y 1 columna en telefonos), con
+  tabla condicional `<!--[if mso]>` para Outlook de escritorio. Verificado en
+  1200, 390 y 320 px sin scroll horizontal; 55 KB.
+- Numeros en formato chileno (970,93 · 11.133), Treasury 10Y con variacion
+  en puntos base, TPM/IPC/desempleo en % sin "s/d", tildes en todo el texto
+  fijo y en los nombres de activos; el IPC del BCCh se rotula "IPC mensual".
+- Se quitan el grafico "Titulares por region" y el simbolo repetido bajo
+  cada activo ("IPSA / IPSA"). Las viñetas de las secciones de Nix solo se
+  muestran si la seccion no trae parrafos (repetian el titular en ingles).
+- El HTML de Nix, antes duplicado en los dos jobs, vive en
+  `render_nix_editorial` (`services/email_formatter.py`).
+
 ### Corregido (cambio de contrato en futuros)
 - Los futuros continuos de Yahoo (`BZ=F`, `CL=F`, cobre, `GC=F`) empalman
   el contrato siguiente sin ajustar al vencer el vigente: el 29-09 el Brent

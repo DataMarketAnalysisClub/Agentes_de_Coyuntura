@@ -1,3 +1,5 @@
+import re
+
 from services.email_formatter import build_email_html, text_to_html
 
 
@@ -57,9 +59,12 @@ def test_build_email_html_includes_assets_table_when_data_available() -> None:
     html = build_email_html("DMAC", "Resumen", snapshots=snaps)
     assert "USD/CLP" in html
     assert "Cobre" in html
-    assert "+1.50%" in html
-    assert "-0.80%" in html
-    assert "yfinance" in html
+    # Formato chileno: coma decimal.
+    assert "+1,50%" in html
+    assert "-0,80%" in html
+    assert "Yahoo Finance" in html
+    # Tabla agrupada por region.
+    assert html.index(">Chile<") < html.index(">Materias primas<")
     assert "Variacion % de activos" not in html
 
 
@@ -88,7 +93,7 @@ def test_build_email_html_skips_deterministic_brief_when_ia_present() -> None:
         nix_analysis_html=nix_html,
         include_deterministic_brief=False,
     )
-    assert "Analisis de Nix" in html_with_ia
+    assert "Análisis de Nix (IA)" in html_with_ia
     assert "Lectura DMAC" not in html_with_ia
     assert "Resumen ejecutivo" not in html_with_ia
     assert "Lectura editorial IA de prueba." in html_with_ia
@@ -99,7 +104,7 @@ def test_build_email_html_ia_card_appears_above_deterministic_sections() -> None
     text_body = "1. Resumen ejecutivo\n* x\n"
     nix_html = "<p>IA TLDR.</p>"
     html = build_email_html("DMAC", text_body, nix_analysis_html=nix_html)
-    assert html.index("Analisis de Nix") < html.index("Resumen ejecutivo")
+    assert html.index("Análisis de Nix (IA)") < html.index("Resumen ejecutivo")
 
 
 def test_build_email_html_omits_ia_charts_for_mvp() -> None:
@@ -111,7 +116,7 @@ def test_build_email_html_omits_ia_charts_for_mvp() -> None:
         "DMAC", "Intro", nix_analysis_html=nix_html,
         nix_chart_pngs={"change_pct_bar": fake_png},
     )
-    assert "Analisis de Nix" in html
+    assert "Análisis de Nix (IA)" in html
     assert "IA editorial." in html
     assert "data:image/png;base64," not in html
     assert "Visualizaciones DMAC AI" not in html
@@ -175,13 +180,15 @@ def test_assets_table_renders_sparkline_when_history_available() -> None:
     ])
 
     assert "1 mes" in html
-    assert "Fuente</th>" not in html
-    # yfinance va en la nota al pie; solo otras fuentes se repiten en la fila.
-    assert "USDCLP &middot;" not in html
-    assert "TPM &middot; bcentral" in html
-    assert "Fuente: yfinance salvo indicacion" in html
+    # Yahoo va en la nota al pie; solo otras fuentes se rotulan en la fila.
+    assert "USDCLP" not in html
+    assert "TPM Chile <span" in html and ">BCCh</span>" in html
+    assert "Fuente: Yahoo Finance salvo indicación" in html
+    # TPM es una tasa: con "%" y sin "s/d" como variacion.
+    assert "4,75%" in html
+    assert "s/d" not in html
     assert 'role="img"' in html
-    assert html.count('<td style="border-bottom:') == 5
+    assert len(re.findall(r'<td style="border-bottom:\d+px solid', html)) == 5
 
 
 def test_assets_table_compacts_large_prices() -> None:
@@ -196,23 +203,23 @@ def test_assets_table_compacts_large_prices() -> None:
         MarketSnapshot(now, "USDCLP", "USD/CLP", 968.97, 0.8, "yfinance"),
     ])
 
-    assert "182,460" in html
-    assert "968.97" in html
+    assert "182.460" in html
+    assert "968,97" in html
 
 
-def test_email_logo_uses_https_url_on_white_chip_and_mobile_styles() -> None:
+def test_email_logo_uses_https_url_and_mobile_styles() -> None:
     html = build_email_html("Asunto", "", logo_url="https://example.com/logo.png")
 
     assert 'src="https://example.com/logo.png"' in html
     assert "data:image" not in html
     assert 'alt="DMAC"' in html
-    assert 'bgcolor="#ffffff"' in html
+    assert "DMAC Brief" in html
     assert "@media only screen and (max-width: 480px)" in html
     assert 'class="dmac-outer"' in html
     assert "rgba(" not in html
 
 
-def test_assets_table_keeps_source_column_without_history() -> None:
+def test_assets_table_omits_trend_column_without_history() -> None:
     from datetime import UTC, datetime
 
     from services.email_charts import render_assets_table
@@ -221,7 +228,7 @@ def test_assets_table_keeps_source_column_without_history() -> None:
     now = datetime.now(UTC)
     html = render_assets_table([MarketSnapshot(now, "USDCLP", "USD/CLP", 965.7, 0.48, "yfinance")])
 
-    assert "Fuente</th>" in html
+    assert "1 mes" not in html
     assert 'role="img"' not in html
 
 
@@ -234,3 +241,66 @@ def test_sparkline_scales_heights_and_skips_short_series() -> None:
     assert "border-bottom:18px solid" in html  # maximo
     flat = render_sparkline((5.0,) * 6)
     assert flat.count("border-bottom:10px solid") == 6
+
+
+def test_yields_change_in_basis_points_and_levels_in_percent() -> None:
+    from datetime import UTC, datetime
+
+    from services.email_charts import format_snapshot_change, format_snapshot_value
+    from storage.models import MarketSnapshot
+
+    now = datetime.now(UTC)
+    ten_year = MarketSnapshot(now, "US10Y", "Treasury 10Y", 5.25, 0.13, "yfinance")
+    assert format_snapshot_value(ten_year) == "5,25%"
+    assert format_snapshot_change(ten_year)[0] == "+0,7 pb"
+    unemployment = MarketSnapshot(now, "DESEMPLEO", "Desempleo Chile", 9.53, None, "bcentral")
+    assert format_snapshot_value(unemployment) == "9,5%"
+    assert format_snapshot_change(unemployment)[0] == ""
+
+
+def test_key_figures_and_fluid_columns_for_mobile() -> None:
+    from datetime import UTC, datetime
+
+    from storage.models import MarketSnapshot
+
+    now = datetime.now(UTC)
+    snaps = [
+        MarketSnapshot(now, "USDCLP", "USD/CLP", 970.93, 1.03, "yfinance"),
+        MarketSnapshot(now, "COPPER", "Cobre", 6.63, 1.02, "yfinance"),
+        MarketSnapshot(now, "IPSA", "IPSA", 11133.0, -0.04, "yfinance"),
+        MarketSnapshot(now, "TPM", "TPM Chile", 4.5, None, "bcentral"),
+    ]
+    html = build_email_html("DMAC Morning Brief | Coyuntura Financiera | 2026-09-29", "", snapshots=snaps,
+                            brief_kind="morning brief")
+
+    assert html.count('class="dmac-kpi"') == 4
+    # Outlook de escritorio recibe las mismas columnas en una tabla condicional.
+    assert "<!--[if mso]><td width=" in html
+    assert ".dmac-kpi { max-width: 50% !important; }" in html
+    assert "Martes 29 de septiembre de 2026" in html
+    assert "Edición de la mañana" in html
+
+
+def test_render_nix_editorial_puts_chile_first_and_escapes() -> None:
+    from types import SimpleNamespace
+
+    from services.email_formatter import render_nix_editorial
+
+    email = SimpleNamespace(
+        headline="Titular <b>",
+        executive_summary=["Punto uno"],
+        sections=[
+            SimpleNamespace(heading="Global", body=["Hecho global."], bullets=["Bullet in English"]),
+            SimpleNamespace(heading="Chile", body=["Hecho Chile."], bullets=[]),
+            SimpleNamespace(heading="A vigilar", body=["x"], bullets=[]),
+        ],
+        risk_flags=["Riesgo"],
+        editorial_cautions=["Cautela"],
+    )
+    html = render_nix_editorial(email)
+
+    assert "Titular &lt;b&gt;" in html
+    assert html.index("Hecho Chile.") < html.index("Hecho global.")
+    # Con parrafos, las viñetas (suelen repetir el titular en ingles) se omiten.
+    assert "Bullet in English" not in html
+    assert "Riesgo" in html and "Cautela" in html
