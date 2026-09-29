@@ -333,33 +333,28 @@ def test_indicators_show_period_and_change_in_points_with_neutral_color() -> Non
     assert "BCCh · 29-09" in html
 
 
-def test_dark_mode_classes_follow_inline_colors() -> None:
-    from services.email_formatter import (
-        DMAC_INK,
-        DMAC_PAPER,
-        DMAC_POSITIVE,
-        apply_dark_mode_classes,
-    )
+def test_email_is_light_only_and_carries_preheader() -> None:
+    nix_html = '<div class="dmac-lead" style="x">Rendimientos de bonos impulsan al dólar</div>'
+    html = build_email_html("[PRUEBA] Asunto", "", nix_analysis_html=nix_html, logo_url="cid:dmac-logo")
 
-    html = apply_dark_mode_classes(
-        f'<td bgcolor="{DMAC_PAPER}" style="color: {DMAC_INK};">x</td>'
-        f'<td class="dmac-px" style="border-bottom:12px solid {DMAC_POSITIVE}"></td>'
-        '<td style="color: #123456;">y</td>'
-    )
-
-    assert 'class="dmc-ink dmb-paper"' in html
-    assert 'class="dmac-px dmr-pos"' in html
-    assert '<td style="color: #123456;">' in html  # colores fuera de la paleta: sin clase
+    # Sin paleta oscura propia: los clientes invierten el diseno claro.
+    assert '<meta name="color-scheme" content="light">' in html
+    assert "prefers-color-scheme" not in html
+    assert "data-ogsc" not in html
+    # Vista previa de la bandeja: el titular de Nix, antes de la cabecera.
+    preheader = html.index("Rendimientos de bonos impulsan al dólar")
+    assert "display: none" in html[preheader - 250 : preheader]
+    assert preheader < html.index("DMAC Brief</td>")
+    assert 'src="cid:dmac-logo"' in html
 
 
-def test_email_declares_dark_mode_and_keeps_logo_on_white() -> None:
-    html = build_email_html("Asunto", "", logo_url="https://example.com/logo.png")
+def test_preheader_falls_back_to_first_headline_and_truncates() -> None:
+    from types import SimpleNamespace
 
-    assert '<meta name="color-scheme" content="light dark">' in html
-    assert "@media (prefers-color-scheme: dark)" in html
-    assert "[data-ogsc] .dmc-ink" in html
-    # La media query de telefonos va en otro bloque: Gmail descarta un <style>
-    # completo si trae selectores como [data-ogsc].
-    mobile_block = html.split("<style>")[1]
-    assert "max-width: 480px" in mobile_block and "data-ogsc" not in mobile_block
-    assert '<td bgcolor="#ffffff"' in html
+    from services.email_formatter import _default_preheader, render_preheader
+
+    news = [SimpleNamespace(title="Cobre sube 2%")]
+    assert _default_preheader(None, news, "intro") == "Cobre sube 2%"
+    assert _default_preheader("", [], "intro") == "intro"
+    long_text = render_preheader("x" * 300)
+    assert "x" * 139 + "…" in long_text

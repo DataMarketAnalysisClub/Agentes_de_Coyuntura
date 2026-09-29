@@ -66,15 +66,22 @@ en `build_email_html` cuando hay IA.
 | Gmail web | OK (no probado con IA real, fallback OK) |
 | Apple Mail | Deberia funcionar (no probado) |
 | Telefonos | Sin scroll horizontal desde ~340 px (medido en 390/360 px). Una media query (`max-width: 480px`) reduce margenes donde se soporta (Apple Mail, Gmail app, Outlook mobile); sin ella igual cabe |
-| Outlook nuevo / web con remitente externo | Bloquea imagenes hasta "Mostrar contenido bloqueado": el logo muestra su texto alternativo "DMAC". El resto del correo no usa imagenes |
+| Outlook nuevo / web con remitente externo | Bloquea imagenes externas hasta "Mostrar contenido bloqueado"; el logo va embebido (`cid:`) y se ve igual. El resto del correo no usa imagenes |
+| Modo oscuro (Outlook nuevo/web, Gmail, Apple Mail) | El correo es solo claro (blanco puro y texto casi negro) y cada cliente lo invierte. No hay paleta oscura propia: Outlook nuevo la aplicaba segun el tema de Windows aunque el lector eligiera "fondo claro", y encima convertia los colores (2026-09-29) |
 | Clientes antiguos (Outlook 2016, Lotus Notes) | Las barras estaticas funcionan; el badge DMAC AI puede no verse con gradient |
 
 ### Reglas de compatibilidad (no romper)
 
-- **Logo por URL HTTPS** (`EMAIL_LOGO_URL`, por defecto el PNG del repo en
-  GitHub), nunca `data:`: Gmail no muestra imagenes `data:` y Outlook
-  web/nuevo las bloquea (el logo salia como "DMAC Logo" roto, 2026-09-29).
-  Va sobre un recuadro blanco porque el PNG es oscuro y transparente.
+- **Logo embebido** (`EMAIL_LOGO_URL=cid:dmac-logo`, archivo
+  `assets/Dmac_logo_email.png`): `EmailSender` lo adjunta como parte
+  `multipart/related` del HTML (alternative -> [text, related -> [html,
+  png]]). Nunca `data:`: Gmail no lo muestra y Outlook web/nuevo lo bloquea.
+  El fondo blanco va dentro del PNG: el modo oscuro no invierte imagenes,
+  pero si oscurecia un recuadro blanco hecho con CSS.
+- **Sin paleta oscura propia** (`color-scheme: light`): blanco puro y texto
+  casi negro se invierten bien; tonos como el marfil quedaban cafe grisaceo.
+- **Vista previa** (`render_preheader`): texto oculto al inicio del body con
+  el titular de Nix, para que la bandeja no muestre la cabecera.
 - **Sin `rgba()`**: Outlook de escritorio lo ignora. Usar hex
   (`DMAC_ON_BRAND*` para texto sobre el azul).
 - **Gradientes siempre con `bgcolor`** de respaldo en la celda.

@@ -2,12 +2,17 @@ import logging
 import smtplib
 from datetime import UTC, datetime
 from email.message import EmailMessage
+from email.utils import formataddr
+from pathlib import Path
 
 from app.config import Settings, get_settings
 from storage.models import SentEmail
 from storage.repositories import SentEmailRepository
 
 logger = logging.getLogger(__name__)
+
+# Content-ID del logo embebido; el HTML lo referencia como src="cid:dmac-logo".
+LOGO_CID = "dmac-logo"
 
 
 class EmailSender:
@@ -32,10 +37,9 @@ class EmailSender:
     ) -> bool:
         """Send the email via SMTP.
 
-        `inline_images` is accepted for backward compatibility but ignored: the
-        HTML body must contain its images as inline base64 data URIs (handled
-        by the email_formatter). This avoids the cid: multipart/related
-        issues that break image rendering in Outlook mobile and Outlook web.
+        `inline_images` is accepted for backward compatibility but ignored.
+        The only embedded image is the logo (`cid:dmac-logo`, see
+        `_embed_logo`); charts are HTML/CSS.
 
         `recipients` overrides EMAIL_TO/EMAIL_CC (e.g. operational alerts that
         must never reach the club mailing list).
@@ -67,12 +71,13 @@ class EmailSender:
 
         message = EmailMessage()
         message["Subject"] = subject
-        message["From"] = self.settings.email_from
+        message["From"] = self._from_header()
         message["To"] = ", ".join(to_list)
         if cc_list:
             message["Cc"] = ", ".join(cc_list)
         message.set_content(text_body)
         message.add_alternative(html_body, subtype="html")
+        self._embed_logo(message, html_body)
 
         try:
             with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port, timeout=30) as smtp:
@@ -86,6 +91,34 @@ class EmailSender:
             logger.error("Failed to send email", extra={"subject": subject}, exc_info=True)
             self._record(subject, recipients_text, "error", str(exc))
             return False
+
+    def _from_header(self) -> str:
+        address = self.settings.email_from
+        if "<" in address or not self.settings.email_from_name:
+            return address
+        return formataddr((self.settings.email_from_name, address))
+
+    def _embed_logo(self, message: EmailMessage, html_body: str) -> None:
+        """Adjunta el logo como parte relacionada del HTML si este lo usa.
+
+        Estructura: multipart/alternative -> [text/plain, multipart/related ->
+        [text/html, image/png]]. Es la que Outlook (web, nuevo, movil), Gmail
+        y Apple Mail muestran sin bloquear ni listar como adjunto.
+        """
+        if f"cid:{LOGO_CID}" not in html_body:
+            return
+        path = Path(self.settings.email_logo_embed_path)
+        if not path.is_absolute():
+            path = Path(__file__).resolve().parent.parent / path
+        try:
+            data = path.read_bytes()
+        except OSError:
+            logger.warning("Logo para embeber no encontrado; el correo mostrara el texto alternativo",
+                           extra={"path": str(path)})
+            return
+        html_part = message.get_payload()[1]
+        html_part.add_related(data, maintype="image", subtype="png", cid=f"<{LOGO_CID}>",
+                              filename="dmac-logo.png", disposition="inline")
 
     def _missing_required_fields(self, recipients: list[str]) -> list[str]:
         missing = []

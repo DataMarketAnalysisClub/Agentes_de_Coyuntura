@@ -61,12 +61,13 @@ corre produccion.
    `@media` y tabla `<!--[if mso]>` para Outlook de escritorio. Formato
    chileno de numeros, Treasury en pb, tildes. `render_nix_editorial`
    reemplaza el HTML de Nix duplicado en los jobs.
-3. **Modo oscuro propio**: `color-scheme: light dark`, paleta oscura via
-   `@media (prefers-color-scheme: dark)` y `[data-ogsc]/[data-ogsb]`
-   (Outlook web/nuevo). `apply_dark_mode_classes` agrega clases segun el
-   color inline de cada elemento: los modulos solo escriben la paleta clara
-   (si se agrega un color nuevo, sumarlo a `_DARK_PALETTE`). Logo sobre
-   recuadro blanco. Textos de 11/12 px subieron a 12/13 px.
+3. **Modo oscuro y logo**: una paleta oscura propia fallo en Outlook nuevo
+   (la aplicaba segun el tema de Windows aunque el lector eligiera "fondo
+   claro", y encima convertia los colores). Se retiro: el correo es solo
+   claro (blanco puro, texto casi negro) y cada cliente lo invierte. El logo
+   va embebido (`cid:dmac-logo`, `assets/Dmac_logo_email.png` con fondo
+   blanco dentro del PNG), el remitente tiene nombre ("DMAC Brief · Nix") y
+   hay vista previa oculta con el titular de Nix. Textos chicos +1 px.
 4. **BCCh**: dolar observado, UF y cobre BML (diarias, con historia); IPC 12
    meses e IMACEC; TPM/IPC/IMACEC/desempleo con periodo y cambio en pp.
    Codigos verificados con `SearchSeries` y documentados en el README.
@@ -76,8 +77,8 @@ corre produccion.
 
 - Produccion con `239704e`: 17/17 yfinance, todas las series BCCh con dato,
   Brent -1,07%, correo "[PRUEBA]" enviado a brcarom@udd.cl (68 KB).
-- Local: capturas Chromium claro/oscuro en 1200, 390 y 320 px. Con modo
-  oscuro y clases el correo pesa ~82 KB (limite de recorte de Gmail ~102 KB).
+- Local: capturas Chromium en 1200, 390 y 320 px. Solo
+  claro el correo pesa ~68 KB (limite de recorte de Gmail ~102 KB).
 
 ## Decisiones del usuario (no re-discutir sin motivo)
 
@@ -95,15 +96,16 @@ corre produccion.
 
 ## Trabajo pendiente (en orden sugerido)
 
-1. **Revisar el modo oscuro y el telefono en clientes reales** (Outlook
-   nuevo/web, Outlook y Gmail en el celular). Gmail no permite controlar su
-   modo oscuro: aplica su propia inversion.
+1. **Revisar en clientes reales** (Outlook nuevo claro/oscuro, Outlook y
+   Gmail en el celular) el logo embebido, la vista previa y el remitente.
+   Si el logo embebido falla en algun cliente, volver a URL con
+   `EMAIL_LOGO_URL=https://...`.
 2. **Revisar el cierre de las 18:30 del 2026-09-29** (primer envio real con
    todo lo nuevo): `docker compose logs --since 1h dmac-market-brief-agent`
    y `python -m app.main health` en el servidor.
-3. **Peso del correo**: ~82 KB. Si Nix trae mas texto puede acercarse a
-   ~102 KB (Gmail recorta). Opcion: clases de modo oscuro en la tabla de la
-   sparkline en vez de en cada celda.
+3. **Remitente institucional**: el correo sale de una cuenta Gmail
+   personal; Outlook UDD lo marca "remitente externo" y bloquea imagenes
+   externas. Una casilla del club o de la UDD mejoraria la entrega.
 4. **Router de temas IA intermitente**: respuesta vacia para "Estados
    Unidos" (`Strict JSON parse failed ... char 0`). Ver reintento o
    `AI_STRICT_JSON`.

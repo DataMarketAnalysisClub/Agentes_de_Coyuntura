@@ -21,14 +21,18 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     email_from: str = ""
+    # Nombre visible del remitente ("DMAC Brief <correo>"). Si EMAIL_FROM ya
+    # trae nombre ("Nombre <correo>"), se respeta.
+    email_from_name: str = "DMAC Brief · Nix"
     email_to: str = ""
     email_cc: str = ""
     email_logo_path: str = "assets/Dmac_logo.png"
-    # Logo por HTTPS: Gmail no muestra imagenes data: y Outlook web/nuevo las
-    # bloquea. Vacio: se incrusta EMAIL_LOGO_PATH como data URI (previews).
-    email_logo_url: str = (
-        "https://raw.githubusercontent.com/DataMarketAnalysisClub/Agentes_de_Coyuntura/main/assets/Dmac_logo.png"
-    )
+    # Logo embebido en el correo (parte `multipart/related`, referenciado como
+    # cid:dmac-logo): se ve aunque Outlook bloquee imagenes externas de un
+    # remitente externo, y su fondo blanco va dentro del PNG. Tambien acepta
+    # una URL HTTPS; vacio incrusta EMAIL_LOGO_PATH como data URI (previews).
+    email_logo_url: str = "cid:dmac-logo"
+    email_logo_embed_path: str = "assets/Dmac_logo_email.png"
     # Avisos de salud de fuentes para mantenedores (nunca a la lista del club).
     # Vacio: los cambios de estado solo quedan en el log.
     ops_email_to: str = ""

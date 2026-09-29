@@ -33,16 +33,20 @@ from services.email_assets import get_logo_img_tag
 from storage.models import MarketSnapshot
 
 # Paleta editorial. Los nombres DMAC_* se mantienen porque otros modulos los
-# importan; los valores son los del diseno "A · Editorial".
+# importan. Tarjeta blanca pura y texto casi negro: los clientes con modo
+# oscuro (Outlook nuevo/web, Gmail) invierten bien blanco/negro, pero el
+# marfil del primer diseno quedaba cafe grisaceo. El correo no trae paleta
+# oscura propia: Outlook nuevo la aplicaba segun el tema de Windows (aunque
+# el lector eligiera "fondo claro") y encima convertia los colores.
 DMAC_INK = "#16223a"
-DMAC_PAPER = "#faf7f0"
-DMAC_PAGE = "#efeae0"
-DMAC_RULE = "#ddd5c4"
-DMAC_RULE_SOFT = "#e6dfd0"
-DMAC_BODY_SOFT = "#3a4457"
+DMAC_PAPER = "#ffffff"
+DMAC_PAGE = "#eef0f3"
+DMAC_RULE = "#dcdfe5"
+DMAC_RULE_SOFT = "#eaecf0"
+DMAC_BODY_SOFT = "#374151"
 DMAC_BRAND_PRIMARY = "#1e4f8c"
 DMAC_BRAND_PRIMARY_DARK = DMAC_INK
-DMAC_BG = "#f3eee4"
+DMAC_BG = "#f5f6f8"
 DMAC_CARD = DMAC_PAPER
 DMAC_TEXT = DMAC_INK
 DMAC_MUTED = "#5b6475"
@@ -494,106 +498,37 @@ def _nix_analysis_section(
     )
 
 
-# --- Modo oscuro ------------------------------------------------------------
+# --- Vista previa en la bandeja --------------------------------------------
 
-# Color claro (inline) -> nombre -> colores oscuros por uso. Cada elemento
-# recibe clases segun los colores de su estilo inline (ver
-# `apply_dark_mode_classes`), asi los modulos siguen escribiendo solo la
-# paleta clara.
-_DARK_PALETTE: dict[str, tuple[str, dict[str, str]]] = {
-    DMAC_PAGE: ("page", {"bg": "#0e1116"}),
-    DMAC_PAPER: ("paper", {"bg": "#161b22"}),
-    DMAC_BG: ("bgsoft", {"bg": "#1c222b"}),
-    DMAC_INK: ("ink", {"text": "#ebe7de", "border": "#9aa4b4", "bg": "#ebe7de"}),
-    DMAC_BODY_SOFT: ("soft", {"text": "#c5cad3"}),
-    DMAC_MUTED: ("muted", {"text": "#9ba4b3", "bg": "#9ba4b3"}),
-    DMAC_BRAND_PRIMARY: ("accent", {"text": "#8cb3ea", "bg": "#8cb3ea", "border": "#8cb3ea"}),
-    DMAC_RULE: ("rule", {"border": "#343c49"}),
-    DMAC_RULE_SOFT: ("rulesoft", {"border": "#2a303a"}),
-    DMAC_POSITIVE: ("pos", {"text": "#5cc991", "border": "#5cc991"}),
-    DMAC_NEGATIVE: ("neg", {"text": "#ff8b7d", "border": "#ff8b7d"}),
-}
-_KIND_PREFIX = {"text": "dmc", "bg": "dmb", "border": "dmr"}
-_TAG_RE = re.compile(r"<([a-zA-Z][a-zA-Z0-9]*)(\s[^<>]*?)?(/?)>")
-_STYLE_RE = re.compile(r'\sstyle="([^"]*)"')
-_BGCOLOR_RE = re.compile(r'\sbgcolor="(#[0-9a-fA-F]{6})"')
-_CLASS_RE = re.compile(r'\sclass="([^"]*)"')
-_HEX_RE = re.compile(r"#[0-9a-fA-F]{6}")
+_LEAD_RE = re.compile(r'class="dmac-lead"[^>]*>([^<]+)<')
+_PREHEADER_MAX = 140
+# Relleno invisible: sin el, Gmail/Outlook completan la vista previa con el
+# texto que sigue (la cabecera "PRUEBA · DATA MARKET ANALYSIS CLUB UDD").
+_PREHEADER_FILLER = "&#847;&zwnj;&nbsp;" * 60
 
 
-def _declaration_kind(prop: str) -> str | None:
-    prop = prop.strip().lower()
-    if prop == "color":
-        return "text"
-    if prop in {"background", "background-color"}:
-        return "bg"
-    if prop.startswith("border"):
-        return "border"
-    return None
+def _default_preheader(nix_html: str | None, news_items: list | None, intro: str) -> str:
+    """Titular de Nix, o el primer titular de noticias, o la intro."""
+    lead = _LEAD_RE.search(nix_html or "")
+    if lead:
+        return lead.group(1).strip()
+    for item in news_items or []:
+        title = str(getattr(item, "title", "") or "").strip()
+        if title:
+            return title
+    return intro
 
 
-def _dark_classes(attrs: str) -> list[str]:
-    classes: list[str] = []
-    style = _STYLE_RE.search(attrs)
-    declarations = style.group(1).split(";") if style else []
-    bgcolor = _BGCOLOR_RE.search(attrs)
-    if bgcolor:
-        declarations.append(f"background: {bgcolor.group(1)}")
-    for declaration in declarations:
-        prop, _, value = declaration.partition(":")
-        kind = _declaration_kind(prop)
-        if kind is None:
-            continue
-        for color in _HEX_RE.findall(value):
-            entry = _DARK_PALETTE.get(color.lower())
-            if entry and kind in entry[1]:
-                name = f"{_KIND_PREFIX[kind]}-{entry[0]}"
-                if name not in classes:
-                    classes.append(name)
-    return classes
+def render_preheader(text: str) -> str:
+    """Texto oculto que la bandeja muestra como vista previa del correo."""
+    from html import unescape
 
-
-def apply_dark_mode_classes(html: str) -> str:
-    """Agrega clases de modo oscuro segun los colores inline de cada elemento."""
-
-    def _tag(match: re.Match) -> str:
-        name, attrs, closing = match.group(1), match.group(2) or "", match.group(3)
-        classes = _dark_classes(attrs)
-        if not classes:
-            return match.group(0)
-        existing = _CLASS_RE.search(attrs)
-        if existing:
-            merged = " ".join([existing.group(1), *classes])
-            attrs = attrs[: existing.start()] + f' class="{merged}"' + attrs[existing.end():]
-        else:
-            attrs = f' class="{" ".join(classes)}"' + attrs
-        return f"<{name}{attrs}{closing}>"
-
-    return _TAG_RE.sub(_tag, html)
-
-
-def _dark_mode_styles() -> str:
-    """CSS de modo oscuro para Apple Mail/Outlook (media query) y Outlook web.
-
-    Van en bloques `<style>` separados: Gmail descarta un bloque completo si
-    encuentra un selector que no soporta (como `[data-ogsc]`), y asi no se
-    pierde la media query de telefonos. Gmail no permite controlar su modo
-    oscuro: aplica su propia inversion.
-    """
-    media: list[str] = []
-    outlook: list[str] = []
-    for _, (name, colors) in _DARK_PALETTE.items():
-        for kind, value in colors.items():
-            css_class = f".{_KIND_PREFIX[kind]}-{name}"
-            prop = {"text": "color", "bg": "background-color", "border": "border-color"}[kind]
-            media.append(f"{css_class} {{ {prop}: {value} !important; }}")
-            # Outlook web/nuevo marca con data-ogsc los textos y con data-ogsb
-            # los fondos que ya convirtio; se sobreescriben con la paleta propia.
-            prefix = "[data-ogsb]" if kind == "bg" else "[data-ogsc]"
-            outlook.append(f"{prefix} {css_class} {{ {prop}: {value} !important; }}")
+    clean = " ".join(unescape(text).split())
+    if len(clean) > _PREHEADER_MAX:
+        clean = clean[: _PREHEADER_MAX - 1].rstrip() + "…"
     return (
-        "<style>@media (prefers-color-scheme: dark) { " + " ".join(media) + " }</style>"
-        "<style>" + " ".join(outlook) + "</style>"
+        "<div style=\"display: none; max-height: 0; overflow: hidden; mso-hide: all; font-size: 1px;"
+        f" line-height: 1px; color: {DMAC_PAGE}; opacity: 0;\">{escape(clean)}{_PREHEADER_FILLER}</div>"
     )
 
 
@@ -624,18 +559,10 @@ def _header_html(
     logo_url: str = "",
     brief_kind: str = "brief",
 ) -> str:
-    logo_img = get_logo_img_tag(logo_path, width=52, url=logo_url)
-    # El logo es oscuro sobre fondo transparente: en modo oscuro desaparecia.
-    # Va sobre un recuadro blanco fijo (bgcolor para Outlook), sin clase de
-    # modo oscuro para que siga blanco.
-    logo_cell = (
-        "<td valign=\"middle\" style=\"padding: 0 14px 0 0;\">"
-        "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"><tr>"
-        f"<td bgcolor=\"#ffffff\" style=\"background: #ffffff; padding: 4px; border-radius: 6px;\">{logo_img}</td>"
-        "</tr></table></td>"
-        if logo_img
-        else ""
-    )
+    logo_img = get_logo_img_tag(logo_path, width=56, url=logo_url)
+    # Con el logo embebido (cid:), el fondo blanco viene dentro del PNG: el
+    # modo oscuro de los clientes no puede oscurecerlo (no invierte imagenes).
+    logo_cell = f"<td valign=\"middle\" style=\"padding: 0 14px 0 0;\">{logo_img}</td>" if logo_img else ""
     tag_match = _SUBJECT_TAG_RE.match(subject)
     tag_html = (
         f"<span style=\"color: {DMAC_NEGATIVE}; font-weight: 700;\">{escape(tag_match.group(1))}</span> &middot; "
@@ -716,6 +643,7 @@ def build_email_html(
     max_news_charts: int = 3,
     news_charts: list | None = None,
     unavailable_sources: list[str] | None = None,
+    preheader: str | None = None,
 ) -> str:
     """Build the HTML email from text body, snapshots, news and AI analysis.
 
@@ -780,22 +708,20 @@ def build_email_html(
         f"<p style=\"margin: 0; color: {DMAC_MUTED};\">Sin contenido relevante para esta corrida.</p>"
     )
 
-    return apply_dark_mode_classes(
+    return (
         "<!doctype html><html lang=\"es\"><head>"
         "<meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-        # Modo oscuro propio (ver _dark_mode_styles): sin esto, Outlook y
-        # Apple Mail convierten los colores por su cuenta y el marfil quedaba
-        # cafe grisaceo con texto de bajo contraste.
-        "<meta name=\"color-scheme\" content=\"light dark\">"
-        "<meta name=\"supported-color-schemes\" content=\"light dark\">"
+        # Solo claro: los clientes con modo oscuro invierten el diseno por su
+        # cuenta (ver la paleta arriba).
+        "<meta name=\"color-scheme\" content=\"light\">"
+        "<meta name=\"supported-color-schemes\" content=\"light\">"
         f"<title>{escape(subject)}</title>"
-        f"<style>:root {{ color-scheme: light dark; }} body, table, td, p, a, li, div {{ font-family: {DMAC_FONT_FAMILY}; }}"
-        f" {_MOBILE_STYLE}</style>"
-        f"{_dark_mode_styles()}"
+        f"<style>body, table, td, p, a, li, div {{ font-family: {DMAC_FONT_FAMILY}; }} {_MOBILE_STYLE}</style>"
         "</head>"
         f"<body bgcolor=\"{DMAC_PAGE}\" style=\"margin: 0; padding: 0; background: {DMAC_PAGE};"
         f" font-family: {DMAC_FONT_FAMILY}; color: {DMAC_TEXT};\">"
+        f"{render_preheader(preheader or _default_preheader(nix_analysis_html, news_items, intro_text))}"
         "<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\""
         f" bgcolor=\"{DMAC_PAGE}\" style=\"width: 100%; background: {DMAC_PAGE};\">"
         "<tr><td align=\"center\" class=\"dmac-outer\" style=\"padding: 20px 12px;\">"

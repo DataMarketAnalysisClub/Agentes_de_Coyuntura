@@ -2,14 +2,17 @@
 
 ## [Unreleased] - 2026-09-29
 
-### Corregido (modo oscuro y telefonos)
-- En Outlook nuevo/web el modo oscuro convertia el marfil en cafe grisaceo
-  con texto de bajo contraste, y el logo oscuro desaparecia. El correo
-  declara `color-scheme: light dark` y trae su propia paleta oscura
-  (`@media (prefers-color-scheme: dark)` y `[data-ogsc]/[data-ogsb]` de
-  Outlook), en bloques `<style>` separados para que Gmail no descarte la
-  media query de telefonos. `apply_dark_mode_classes` asigna las clases segun
-  el color inline de cada elemento. Logo sobre recuadro blanco.
+### Corregido (modo oscuro, logo y presentacion en la bandeja)
+- Se retira la paleta oscura propia: Outlook nuevo la aplicaba segun el tema
+  de Windows aunque el lector eligiera "fondo claro", y ademas convertia los
+  colores (fondo gris translucido, logo invisible). El correo es solo claro,
+  con tarjeta blanca pura y texto casi negro, que los clientes invierten bien.
+- Logo embebido como parte `multipart/related` (`cid:dmac-logo`), con el
+  fondo blanco dentro del PNG (`assets/Dmac_logo_email.png`): se ve aunque
+  Outlook bloquee imagenes externas y no se oscurece en modo oscuro.
+- Remitente con nombre visible (`EMAIL_FROM_NAME`, "DMAC Brief · Nix") y
+  vista previa oculta con el titular de Nix, para que la bandeja no muestre
+  "PRUEBA · DATA MARKET ANALYSIS CLUB UDD".
 - Textos chicos de 11/12 px suben a 12/13 px; la fuente y el periodo de cada
   activo van en su propia linea bajo el nombre (se cortaban en telefonos).
 
