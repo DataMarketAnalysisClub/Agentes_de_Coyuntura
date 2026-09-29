@@ -44,7 +44,11 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 ### Fuentes de Datos
 
 **Datos economicos:**
-- BCCh API: TPM, IPC (requiere credenciales)
+- BCCh API (requiere credenciales): TPM, IPC, tasa de desempleo (INE,
+  mensual) y USD/PEN (`F072.PEN.USD.N.O.D`, diaria, con ~1 mes de historia
+  para la sparkline). Las series se piden en paralelo con yfinance; los dias
+  sin dato (`NaN`) se ignoran y una serie diaria con mas de 7 dias de
+  antiguedad no se muestra.
 - yfinance (`1.7.0`, fijada): precios de activos (USDCLP, COPPER, IPSA,
   SP500, etc.) y ~1 mes de cierres diarios para las sparklines del correo.
   Unica fuente de datos de mercado (Google Finance se retiro del pipeline).
@@ -53,7 +57,8 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
     historial diario en Yahoo viene incompleto.
   - Series con velas inconsistentes (cierre fuera de maximo/minimo) o con
     ultimo cierre de hace mas de 7 dias se descartan y se muestran como
-    "s/d". Hoy afecta a `PEN=X` (USD/PEN).
+    "s/d". Por eso USD/PEN salio de yfinance (`PEN=X` traia velas
+    inconsistentes) y se toma del BCCh.
 
 **Noticias RSS (5 fuentes funcionales, descargadas en paralelo):**
 - Federal Reserve (EE.UU. macro)
@@ -66,6 +71,12 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 - La Tercera Pulso: negocios y economia chilena. Se lee desde su RSS oficial
   (Arc Publishing, con fecha de publicacion real); el scraping del HTML del
   canal queda solo como respaldo si el RSS no entrega notas.
+- Diario Financiero: RSS de portada (`df.cl/noticias/site/list/port/rss.xml`).
+  Solo se usan titulo, bajada y link del feed (no se descarga el articulo).
+  Se conservan las secciones Mercados, Economia y Politica, Empresas,
+  Internacional y Primer Click; Opinion, Regiones y suplementos se descartan.
+- Ambas fuentes chilenas se descargan en paralelo, cada una con su propio
+  circuit breaker.
 
 ## IA y Ollama Cloud
 
@@ -294,6 +305,8 @@ Banco Central de Chile:
 - `BCENTRAL_CREDENTIALS_FILE`: ruta a archivo externo no versionado. Formato esperado: primera linea correo, segunda linea contrasena.
 - `BCENTRAL_TPM_SERIES`: serie para TPM. Default: `F022.TPM.TIN.D001.NO.Z.D`.
 - `BCENTRAL_IPC_SERIES`: serie para IPC/inflacion. Default: `F074.IPC.VAR.Z.Z.C.M`.
+- `BCENTRAL_UNEMPLOYMENT_SERIES`: tasa de desocupacion (INE). Default: `F049.DES.TAS.INE9.10.M`.
+- `BCENTRAL_USDPEN_SERIES`: soles peruanos por dolar. Default: `F072.PEN.USD.N.O.D`.
 - `BCENTRAL_TIMEOUT_SECONDS`: timeout HTTP para BCCh.
 
 Ejemplo local seguro:

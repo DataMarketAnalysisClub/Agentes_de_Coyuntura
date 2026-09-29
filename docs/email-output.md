@@ -105,6 +105,12 @@ con link a la fuente).
   rises" -> Brent y Treasury 10Y. "Dolar" en castellano es USD/CLP y
   "dollar" en ingles es el DXY; "bonos" en castellano no activa el Treasury.
 - Si ningun titular menciona un activo graficable, la seccion no aparece.
+- Con la IA activa (`AI_ENABLED` y `AI_BRIEF_ENABLED`), cada tarjeta suma
+  una linea rotulada "Lectura de Nix (IA):" que conecta el titular con el
+  movimiento (`services/ai/news_chart_readings.py`, prompt
+  `prompts/ai/news_chart_reading.md`). Nix solo redacta: lecturas para
+  activos fuera de los candidatos, de mas de 220 caracteres o que sugieran
+  operar se descartan. Si la IA falla, la tarjeta sale sin la linea.
 - Costo: ~2 KB por tarjeta.
 
 ### IA-sugeridas (DESHABILITADAS en MVP)

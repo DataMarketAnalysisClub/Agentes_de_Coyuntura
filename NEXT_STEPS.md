@@ -1,20 +1,22 @@
 # Siguientes Pasos
 
-Estado a v0.14.0 (2026-09-28). Reemplaza la version anterior de este archivo
+Estado a v0.14.0 + cambios sin version (2026-09-29, ver `CHANGELOG.md`
+"Unreleased"). Reemplaza la version anterior de este archivo
 (escrita en v0.2.0), cuyas opciones A-D quedaron implementadas o superadas.
 
 ## Estado de fuentes (medido en vivo el 2026-09-28)
 
 | Fuente | Tipo | Estado |
 |--------|------|--------|
-| BCCh API | Datos (TPM, IPC) | Funcional (requiere credenciales) |
-| yfinance 1.7.0 | Datos de mercado + series 1 mes | 17/18 en ~2.5s; IPSA via `MXIPSAGC.SN`; USD/PEN descartado por datos inconsistentes |
+| BCCh API | Datos (TPM, IPC, desempleo, USD/PEN) | Funcional (requiere credenciales). Desempleo y USD/PEN agregados el 2026-09-29, **no verificados en vivo** (sin credenciales en la maquina de desarrollo) |
+| yfinance 1.7.0 | Datos de mercado + series 1 mes | 17/17 en ~2.5s; IPSA via `MXIPSAGC.SN`; USD/PEN paso al BCCh |
 | Federal Reserve | RSS | 20 notas |
 | ECB | RSS | 15 notas |
 | Financial Times | RSS | 12 notas |
 | MarketWatch | RSS | 10 notas |
 | Investing.com | RSS | 10 notas (fecha no RFC 822, ya soportada) |
 | La Tercera Pulso | RSS oficial + respaldo HTML | 20 notas con fecha real |
+| Diario Financiero | RSS de portada filtrado por seccion | 16 de 50 notas (2026-09-29) |
 
 Descarga de RSS: ~2.9s en serie -> ~0.7s en paralelo (0.24s con conexiones
 reutilizadas). Detalle en `CHANGELOG.md` (0.14.0).
@@ -37,9 +39,9 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
 
 ### Pendientes
 
-1. **USD/PEN.** `PEN=X`, `USDPEN=X` y `PENUSD=X` traen las mismas velas
-   inconsistentes (16 de 23). Hoy se muestra "s/d". Opciones: otra fuente
-   (BCRP publica el tipo de cambio oficial), o sacarlo de `DEFAULT_ASSETS`.
+1. ~~USD/PEN~~: resuelto, se toma del BCCh (`F072.PEN.USD.N.O.D`).
+   **Verificar en el servidor** con credenciales que la serie venga al dia
+   (si el ultimo dato tiene > 7 dias, se oculta y queda un warning).
 2. **IPSA via proxy de Yahoo.** `MXIPSAGC.SN` coincide con el S&P IPSA, pero
    Yahoo lo rotula "MSCI IPSA INDEX (con dividendos)" y su historial solo
    parte en sep-2026. Si el BCCh publica una serie del IPSA, seria la fuente
@@ -51,10 +53,11 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
    batch (solo lo registra en su log), asi que el cliente no distingue "sin
    datos" de "bloqueado". Si reaparecen bloqueos, revisar los logs de
    `yfinance` y considerar cachear la ultima serie buena en SQLite.
-5. **Rol de la IA en "En foco".** Hoy la seleccion es deterministica. Pasos
-   posibles, en orden de riesgo: (a) que Nix escriba una linea de lectura
-   por grafico ("el cobre cae por la huelga en Centinela"), sin elegir
-   activos; (b) exponer los candidatos como `chart_ids` del writer
+5. **Rol de la IA en "En foco".** Paso (a) implementado: Nix escribe una
+   linea de lectura por grafico, sin elegir activos
+   (`services/ai/news_chart_readings.py`). Falta probarlo con Ollama real
+   (`AI_ENABLED=true`, `AI_DRY_RUN=false`) y revisar el tono de las lineas.
+   Paso (b), no implementado: exponer los candidatos como `chart_ids` del writer
    (`asset_trend:COPPER`) para que la IA ordene entre ellos, siempre
    filtrado por los candidatos deterministicos. La IA nunca deberia poder
    pedir un activo que ninguna noticia menciona.
@@ -76,10 +79,8 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
 
 ## Scraping y noticias: siguientes optimizaciones
 
-1. **Ampliar fuentes chilenas (decision del club).** Diario Financiero publica
-   un RSS (`https://www.df.cl/noticias/site/list/port/rss.xml`, 50 notas con
-   fecha, probado). Agregarlo es un metodo corto en `ChileNewsClient`
-   reutilizando `parse_feed`. Hoy Chile depende de una sola fuente.
+1. ~~Ampliar fuentes chilenas~~: Diario Financiero agregado (RSS de portada,
+   filtrado por seccion).
 2. **GET condicional.** Guardar `ETag`/`Last-Modified` por feed y enviar
    `If-None-Match`/`If-Modified-Since` en el monitor de alto impacto (corre
    cada 15 min) para no bajar feeds sin cambios.
@@ -87,17 +88,16 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
    `collect_market_and_news`, que pide los 18 tickers y el BCCh en cada
    corrida (96 veces al dia, tambien de noche y fines de semana). Podria
    reutilizar el ultimo snapshot o limitarse al horario de mercado.
-4. **Falsos positivos del clasificador.** `services/news_classifier.py` busca
-   palabras clave por substring: `"us "` calza con "focus"/"status", `"sec"`
-   con "sector", `"oil"` con "turmoil", `"rate"` con "corporate", e `"ipc"`
-   manda el IPC de Mexico a la region Chile. Usar limites de palabra
-   (`\b...\b`) y agregar tests de regresion.
+4. ~~Falsos positivos del clasificador~~: resuelto con limites de palabra y
+   tests de regresion. Queda abierto: las notas chilenas que no dicen
+   "Chile" ("Dolar abre a la baja") caen en "Global"; se podria usar la
+   fuente (La Tercera, DF) como senal de region por defecto.
 5. **Deduplicacion.** Sigue siendo O(n^2) con `SequenceMatcher`; el cache
    `lru_cache(maxsize=512)` es chico para ~100 notas (~5.000 pares). Con el
    filtro de recencia antes de deduplicar el volumen bajo, pero puede
    mejorarse con un indice por tokens.
-6. **BCCh.** `BCentralClient` crea un `httpx.Client` que nunca se cierra y
-   pide TPM e IPC en serie; sus logs de error no incluyen el mensaje real.
+6. ~~BCCh~~: resuelto (cliente por request, series en paralelo, logs con
+   el mensaje sin credenciales).
 
 ---
 

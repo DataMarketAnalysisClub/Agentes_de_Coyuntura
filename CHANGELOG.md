@@ -1,5 +1,40 @@
 # Changelog
 
+## [Unreleased] - 2026-09-29
+
+### Agregado
+- Diario Financiero como segunda fuente chilena (`ChileNewsClient._fetch_df`):
+  RSS de portada filtrado por seccion (Mercados, Economia y Politica,
+  Empresas, Internacional, Primer Click). Las fuentes chilenas se descargan
+  en paralelo con un circuit breaker por medio.
+- BCCh: tasa de desempleo (`F049.DES.TAS.INE9.10.M`, fila "Desempleo Chile")
+  y USD/PEN (`F072.PEN.USD.N.O.D`) con variacion diaria y ~1 mes de historia
+  (sparkline y "En foco"). Settings `BCENTRAL_UNEMPLOYMENT_SERIES` y
+  `BCENTRAL_USDPEN_SERIES`.
+- "En foco": linea "Lectura de Nix (IA)" por grafico
+  (`services/ai/news_chart_readings.py`). La seleccion sigue siendo
+  deterministica; la IA solo redacta sobre los candidatos y se descartan
+  lecturas fuera de ellos, demasiado largas o con lenguaje de recomendacion.
+  `build_email_html` acepta `news_charts` ya seleccionados.
+
+### Cambiado
+- USD/PEN sale de yfinance (`PEN=X` traia velas inconsistentes) y se toma
+  del BCCh.
+- `BCentralClient`: ya no crea un `httpx.Client` que nunca se cerraba; las
+  series se piden en paralelo entre si y con yfinance; los logs incluyen el
+  mensaje de error sin credenciales (un error HTTP de httpx trae la URL con
+  usuario y contrasena) y la descripcion de los codigos de error de la API.
+- `services/news_classifier.py`: palabras clave con limites de palabra y
+  plural opcional. Corrige falsos positivos por substring (`"us "` en
+  focus/bonus, `"sec"` en sector, `"oil"` en turmoil, `"rate"` en corporate,
+  `"oro"` en deterioro, `"war"` en warned, `"fiscal"` en fiscalizacion) y el
+  IPC de Mexico ya no se clasifica como Chile. "US" en mayusculas sigue
+  contando como EE.UU. (no "US$").
+
+### Corregido
+- BCCh: los dias sin dato (`"NaN"`) se tomaban como observaciones validas
+  (`float("NaN")` no falla), por lo que el "ultimo valor" podia ser NaN.
+
 ## [0.14.0] - 2026-09-22
 
 Primera pasada de fixes tras varios meses de marcha blanca en servidor propio.

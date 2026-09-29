@@ -54,6 +54,9 @@ USD/CLP, y cada grafico cita el titular que lo activo.
 - Render: `services/email_charts.py` (`render_news_charts_section`), HTML/CSS
   sin imagenes, igual que las sparklines.
 - Si ninguna noticia menciona un activo con historia, la seccion no aparece.
+- Lectura de Nix (`services/ai/news_chart_readings.py`): con la IA activa,
+  una linea rotulada por grafico. La IA solo redacta sobre los candidatos
+  deterministicos; nunca elige ni agrega activos.
 - Para agregar un activo graficable: sumarlo a `DEFAULT_ASSETS` (yfinance) y
   sus terminos a `ASSET_NEWS_KEYWORDS`, con un test de falso positivo.
 
