@@ -90,9 +90,13 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
    corrida (96 veces al dia, tambien de noche y fines de semana). Podria
    reutilizar el ultimo snapshot o limitarse al horario de mercado.
 4. ~~Falsos positivos del clasificador~~: resuelto con limites de palabra y
-   tests de regresion. Queda abierto: las notas chilenas que no dicen
-   "Chile" ("Dolar abre a la baja") caen en "Global"; se podria usar la
-   fuente (La Tercera, DF) como senal de region por defecto.
+   tests de regresion. Region por defecto "Chile" para medios chilenos,
+   cupo chileno en titulares y filtro de comunicados administrativos de
+   bancos centrales: hechos (ver CHANGELOG). Queda abierto:
+   `HIGH_SIGNAL_TERMS` y `LOW_VALUE_PATTERNS` (`services/news_quality.py`)
+   siguen buscando por substring e incluyen el nombre de la fuente en el
+   texto evaluado ("federal reserve" siempre es alta senal); e
+   `impact_scoring` suma +1 a Latam/EE.UU./Global pero no a Chile.
 5. **Deduplicacion.** Sigue siendo O(n^2) con `SequenceMatcher`; el cache
    `lru_cache(maxsize=512)` es chico para ~100 notas (~5.000 pares). Con el
    filtro de recencia antes de deduplicar el volumen bajo, pero puede

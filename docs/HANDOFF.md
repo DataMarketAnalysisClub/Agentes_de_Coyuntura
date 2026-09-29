@@ -36,6 +36,14 @@ caidas. La regla "warning y continuar" las volvia invisibles.
 5. CI (`.github/workflows/ci.yml`) y `requirements-dev.txt` (pytest y ruff
    fuera de la imagen Docker).
 
+## Despues: relevancia chilena (rama `feat/chile-relevance`, desde `feat/source-health`)
+
+Diagnostico con noticias reales: los 3 titulares eran comunicados de la Fed
+y el BCE y ninguna nota chilena. Decisiones del usuario: cupo chileno 1 de 3
+(solo si pasa calidad) y filtrar comunicados administrativos de la Fed y el
+BCE. Ademas: DF con tier 2 (bug) y region por defecto "Chile" para medios
+chilenos (salvo DF Internacional).
+
 ## Decisiones del usuario (no re-discutir sin motivo)
 
 - `OPS_EMAIL_TO` lo configura el usuario en el `.env` del servidor.

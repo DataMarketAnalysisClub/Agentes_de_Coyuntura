@@ -2,6 +2,23 @@
 
 ## [Unreleased] - 2026-09-29
 
+### Cambiado (relevancia para el lector chileno)
+- Cupo chileno en los titulares principales (`select_executive_news`,
+  `guaranteed_region="Chile"`): si ninguno de los 3 es de Chile y hay una
+  nota chilena que pasa el filtro de calidad, la mejor reemplaza al ultimo.
+  Nunca se fuerza una nota que no pase calidad.
+- Region por defecto "Chile" para La Tercera Pulso y Diario Financiero
+  cuando ninguna palabra clave indica otra region (salvo la seccion
+  Internacional de DF). Con las noticias del 2026-09-29: 7 -> 30 de 36 notas
+  chilenas quedan como Chile.
+- Se descartan comunicados administrativos de la Fed y el BCE (aprobaciones
+  de solicitudes bancarias, enforcement actions, consultas publicas,
+  billetes): antes pasaban siempre y desplazaban noticias de mercado.
+
+### Corregido (relevancia)
+- Diario Financiero no tenia tier en `SOURCE_TIERS` (quedaba en el mas bajo);
+  ahora es tier 2, igual que La Tercera Pulso.
+
 ### Agregado (salud de fuentes)
 - `services/source_health.py`: evalua cada corrida contra lo esperado. Un
   feed sin notas o un activo sin precio queda "caida"; un feed cuya nota mas
