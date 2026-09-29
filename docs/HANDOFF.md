@@ -91,6 +91,11 @@ corre produccion.
 - Graficos del correo en HTML/CSS (sin imagenes); logo por URL.
 - Diseno "Editorial" (propuesta A) aprobado; debe ser responsivo.
 - USD/CLP de Yahoo en la tabla + dolar observado del BCCh como referencia.
+- Asunto con el titular de Nix ("DMAC Brief · 29 sep — <titular>").
+- Correo solo claro (sin paleta oscura propia) y logo embebido: el usuario
+  valido las visuales en Outlook el 2026-09-29.
+- SMTP institucional de la UDD: el usuario lo pedira cuando el brief sea
+  algo demostrable y en uso; por ahora sigue la cuenta Gmail.
 - IPSA desde yfinance con `MXIPSAGC.SN` (aprobado 2026-09-29). No buscar
   otra fuente salvo que Yahoo deje de publicarlo.
 
