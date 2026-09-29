@@ -42,13 +42,11 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
 1. ~~USD/PEN~~: resuelto, se toma del BCCh (`F072.PEN.USD.N.O.D`).
    **Verificar en el servidor** con credenciales que la serie venga al dia
    (si el ultimo dato tiene > 7 dias, se oculta y queda un warning).
-2. **IPSA via proxy de Yahoo.** `MXIPSAGC.SN` coincide con el S&P IPSA, pero
-   Yahoo lo rotula "MSCI IPSA INDEX (con dividendos)" y su historial solo
-   parte en sep-2026. Si el BCCh publica una serie del IPSA, seria la fuente
-   oficial preferible. Revisar el ticker si Yahoo vuelve a cambiarlo:
+2. ~~IPSA oficial~~: decidido. La fuente aprobada es `MXIPSAGC.SN` via
+   yfinance (2026-09-29; alternativas evaluadas en el README). El BCCh solo
+   publica el promedio mensual. Si Yahoo vuelve a cambiar el ticker,
    `python -m scripts.diagnose_market_data` lo muestra como "SIN DATOS".
-3. **`^TNX`.** La variacion es % del yield, no puntos base. Para tasas
-   conviene mostrar el cambio en pb.
+3. ~~`^TNX`~~: resuelto, el correo muestra el cambio del Treasury 10Y en pb.
 4. **Rate limit.** yfinance 1.7 no lanza excepcion por ticker fallido en un
    batch (solo lo registra en su log), asi que el cliente no distingue "sin
    datos" de "bloqueado". Ahora un bloqueo se ve como activos "caida" en la

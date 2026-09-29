@@ -63,9 +63,12 @@ class Quote:
 DEFAULT_ASSETS: tuple[MarketAsset, ...] = (
     MarketAsset("USDCLP", "USD/CLP", "CLP=X"),
     MarketAsset("COPPER", "Cobre", "HG=F"),
-    # Yahoo dejo de publicar ^IPSA ("symbol may be delisted"). MXIPSAGC.SN
-    # (Bolsa de Santiago) replica el nivel del S&P IPSA, pero su historial
-    # diario viene con un solo dato: se usan velas horarias.
+    # Fuente del IPSA aprobada por el club (2026-09-29): MXIPSAGC.SN via
+    # yfinance. Yahoo dejo de publicar ^IPSA y SPIPSA.SN quedo congelado al
+    # 31-08-2026. Yahoo rotula este ticker "MSCI IPSA INDEX (con dividendos)",
+    # pero su nivel coincide con el S&P IPSA (cierre 28-09: 11.137,23 vs
+    # 11.137,59). Tiene 20 min de retraso y su historial diario viene con un
+    # solo dato: se usan velas horarias y se toma el ultimo cierre de cada dia.
     MarketAsset("IPSA", "IPSA", "MXIPSAGC.SN", interval="1h"),
     MarketAsset("SP500", "S&P 500", "^GSPC"),
     MarketAsset("VOO", "VOO", "VOO"),

@@ -191,7 +191,7 @@ def test_yfinance_client_caps_history_points(monkeypatch) -> None:
     assert quotes[0].history[-1] == 30.0
 
 
-def test_default_ipsa_uses_hourly_bolsa_santiago_ticker() -> None:
+def test_default_ipsa_uses_approved_hourly_ticker() -> None:
     ipsa = next(a for a in DEFAULT_ASSETS if a.symbol == "IPSA")
     assert ipsa.yf_ticker == "MXIPSAGC.SN"
     assert ipsa.interval == "1h"

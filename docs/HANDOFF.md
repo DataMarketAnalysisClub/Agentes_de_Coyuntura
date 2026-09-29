@@ -80,6 +80,8 @@ git checkout main && git merge --ff-only fix/email-crossplatform && git push ori
   Ultimo dato valido rotulado con fecha: si; la IA nunca lo recibe.
 - Cupo chileno 1 de 3 y filtro de comunicados administrativos: si.
 - Graficos del correo en HTML/CSS (sin imagenes); logo por URL.
+- IPSA desde yfinance con `MXIPSAGC.SN` (aprobado 2026-09-29). No buscar
+  otra fuente salvo que Yahoo deje de publicarlo.
 
 ## Trabajo pendiente (en orden sugerido)
 
@@ -105,7 +107,7 @@ git checkout main && git merge --ff-only fix/email-crossplatform && git push ori
 7. **Salud de fuentes**: calibrar umbrales tras ~2 semanas mirando `health`.
 8. **Correo**: 320 px aun desborda ~22 px; simbolo redundante bajo el nombre
    ("IPSA / IPSA"); considerar `color-scheme` para modo oscuro.
-9. Backlog de `NEXT_STEPS.md`: IPSA oficial (BCCh), `^TNX` en puntos base,
+9. Backlog de `NEXT_STEPS.md`:
    GET condicional, monitor mas liviano, deduplicacion O(n^2), paso (b) de
    IA en "En foco", proteger `main` exigiendo CI verde.
 

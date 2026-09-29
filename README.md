@@ -65,9 +65,14 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 - yfinance (`1.7.0`, fijada): precios de activos (USDCLP, COPPER, IPSA,
   SP500, etc.) y ~1 mes de cierres diarios para las sparklines del correo.
   Unica fuente de datos de mercado (Google Finance se retiro del pipeline).
-  - IPSA: Yahoo dejo de publicar `^IPSA`; se usa `MXIPSAGC.SN` (Bolsa de
-    Santiago, mismo nivel que el S&P IPSA) con velas horarias, porque su
-    historial diario en Yahoo viene incompleto.
+  - IPSA: fuente aprobada `MXIPSAGC.SN` (decision del club, 2026-09-29),
+    con velas horarias porque su historial diario en Yahoo viene incompleto;
+    20 min de retraso. Yahoo lo rotula "MSCI IPSA INDEX (con dividendos)",
+    pero su nivel coincide con el S&P IPSA. Alternativas evaluadas y
+    descartadas: `^IPSA` y `SPCLXIPSA.SN` (sin datos), `SPIPSA.SN` y
+    findic.cl (congelados al 31-08-2026), BCCh (solo promedio mensual), API
+    Brain Data de la Bolsa de Santiago (requiere cuenta y revisar terminos
+    de redistribucion) e Investing.com (scraping).
   - Series con velas inconsistentes (cierre fuera de maximo/minimo) o con
     ultimo cierre de hace mas de 7 dias se descartan y se muestran como
     "s/d". Por eso USD/PEN salio de yfinance (`PEN=X` traia velas
