@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from data_sources.google_finance_client import GoogleFinanceClient, GoogleFinanceMarketItem
 from storage.models import MarketSnapshot
 
 
@@ -16,20 +15,12 @@ class MarketSentiment:
 RISK_ON_SYMBOLS = {"SP500", "VOO", "NASDAQ100", "IPSA", "BOVESPA", "MEXIPC", "COPPER"}
 RISK_OFF_SYMBOLS = {"VIX", "DXY", "US10Y"}
 
-GOOGLE_RISK_ON = {"S&P 500", "Nasdaq", "Dow Jones", "S&P Futures", "Nasdaq Futures", "S&P LATAM 40", "IBOVESPA"}
-GOOGLE_RISK_OFF = {"VIX"}
-
 
 def collect_market_sentiment(snapshots: list[MarketSnapshot]) -> MarketSentiment:
-    google_items = GoogleFinanceClient().fetch_market_summary()
-    return build_market_sentiment(snapshots, google_items)
+    return build_market_sentiment(snapshots)
 
 
-def build_market_sentiment(
-    snapshots: list[MarketSnapshot],
-    google_items: list[GoogleFinanceMarketItem] | None = None,
-) -> MarketSentiment:
-    google_items = google_items or []
+def build_market_sentiment(snapshots: list[MarketSnapshot]) -> MarketSentiment:
     contributions: list[tuple[str, float, str]] = []
 
     for snapshot in snapshots:
@@ -39,14 +30,6 @@ def build_market_sentiment(
             contributions.append((snapshot.name, snapshot.change_pct, snapshot.source))
         elif snapshot.symbol in RISK_OFF_SYMBOLS:
             contributions.append((snapshot.name, -snapshot.change_pct, snapshot.source))
-
-    for item in google_items:
-        if item.change_pct is None:
-            continue
-        if item.name in GOOGLE_RISK_ON:
-            contributions.append((item.name, item.change_pct, "google_finance"))
-        elif item.name in GOOGLE_RISK_OFF:
-            contributions.append((item.name, -item.change_pct, "google_finance"))
 
     if not contributions:
         return MarketSentiment(
@@ -63,8 +46,6 @@ def build_market_sentiment(
     label = _label_for_score(score)
     drivers = _drivers(contributions)
     source = "yfinance"
-    if any(source_name == "google_finance" for _, _, source_name in contributions):
-        source += " + Google Finance"
 
     summary = _summary(label, score, drivers)
     return MarketSentiment(label=label, score=score, summary=summary, drivers=drivers, source=source)

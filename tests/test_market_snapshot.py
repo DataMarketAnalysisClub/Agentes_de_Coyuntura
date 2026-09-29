@@ -23,8 +23,8 @@ class EmptyMarketClient:
 class FallbackMarketClient:
     def fetch_quotes(self) -> list[Quote]:
         return [
-            Quote("SP500", "S&P 500", 7440.43, 1.18, "google_finance"),
-            Quote("WTI", "Petroleo WTI", 68.5, -0.4, "google_finance"),
+            Quote("SP500", "S&P 500", 7440.43, 1.18, "fallback_provider"),
+            Quote("WTI", "Petroleo WTI", 68.5, -0.4, "fallback_provider"),
         ]
 
 
@@ -62,6 +62,6 @@ def test_market_snapshot_uses_fallback_when_primary_has_no_values() -> None:
     by_symbol = {snapshot.symbol: snapshot for snapshot in snapshots}
     assert by_symbol["SP500"].price == 7440.43
     assert by_symbol["SP500"].change_pct == 1.18
-    assert by_symbol["SP500"].source == "google_finance"
+    assert by_symbol["SP500"].source == "fallback_provider"
     assert by_symbol["GOLD"].price is None
     assert by_symbol["WTI"].price == 68.5

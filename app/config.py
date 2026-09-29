@@ -31,8 +31,6 @@ class Settings(BaseSettings):
     bcentral_tpm_series: str = "F022.TPM.TIN.D001.NO.Z.D"
     bcentral_ipc_series: str = "F074.IPC.VAR.Z.Z.C.M"
     bcentral_timeout_seconds: float = 20.0
-    fred_api_key: str = ""
-    alpha_vantage_api_key: str = ""
 
     market_data_provider: str = "yfinance"
     database_url: str = "sqlite:///storage/dmac_market_brief.db"

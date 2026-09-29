@@ -4,7 +4,6 @@ from typing import Protocol
 
 from app.config import get_settings
 from data_sources.bcentral_client import BCentralClient
-from data_sources.google_finance_client import GoogleFinanceQuoteClient
 from data_sources.yfinance_client import Quote, YFinanceClient
 from storage.models import MarketSnapshot
 
@@ -74,7 +73,7 @@ class MarketSnapshotService:
 
         logger.warning(
             "Using fallback market data provider",
-            extra={"provider": "google_finance", "count": len(fallback_quotes)},
+            extra={"provider": type(self.fallback_market_client).__name__, "count": len(fallback_quotes)},
         )
         by_symbol = {quote.symbol: idx for idx, quote in enumerate(quotes)}
         merged = list(quotes)
@@ -110,10 +109,10 @@ class NoopMarketClient:
 
 
 def _build_fallback_market_client() -> MarketQuoteClient:
-    provider = get_settings().market_data_provider.strip().lower()
-    if provider in {"none", "disabled", "off"}:
-        return NoopMarketClient()
-    return GoogleFinanceQuoteClient()
+    # Google Finance ya no se usa como fallback (ver decision del club, 2026-09).
+    # yfinance es la unica fuente de datos de mercado; si falla, la tabla de
+    # activos del correo queda vacia ("Mercado cerrado o sin datos disponibles").
+    return NoopMarketClient()
 
 
 def _build_market_client() -> MarketQuoteClient:
