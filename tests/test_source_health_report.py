@@ -69,7 +69,8 @@ def test_last_valid_prices_skips_nulls_and_keeps_latest() -> None:
 
     prices = repo.last_valid_prices(NOW - timedelta(days=5))
 
-    assert prices == {"SP500": (7400.0, NOW - timedelta(days=1))}
+    assert (prices["SP500"].price, prices["SP500"].timestamp) == (7400.0, NOW - timedelta(days=1))
+    assert list(prices) == ["SP500"]
 
 
 def test_empty_table_message() -> None:

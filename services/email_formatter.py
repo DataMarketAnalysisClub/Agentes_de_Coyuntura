@@ -326,6 +326,16 @@ def _header_html(subject: str, intro: str, logo_path: str = "") -> str:
     )
 
 
+def render_unavailable_sources(sources: list[str]) -> str:
+    """Linea discreta con las fuentes que no trajeron datos en esta edicion."""
+    names = ", ".join(escape(source) for source in dict.fromkeys(sources))
+    return (
+        "<tr><td style=\"padding: 16px 24px 0 24px;\">"
+        f"<p style=\"margin: 0; font-size: 11px; color: {DMAC_MUTED};\">"
+        f"Sin datos en esta edicion: {names}.</p></td></tr>"
+    )
+
+
 def _footer_html() -> str:
     return (
         "<tr><td style=\"padding: 24px; border-top: 1px solid "
@@ -372,6 +382,7 @@ def build_email_html(
     market_sentiment=None,
     max_news_charts: int = 3,
     news_charts: list | None = None,
+    unavailable_sources: list[str] | None = None,
 ) -> str:
     """Build a professional HTML email from text body, snapshots, and AI analysis.
 
@@ -441,6 +452,9 @@ def build_email_html(
             focus_html = _render_news_charts_section(news_charts)
             if focus_html:
                 section_rows.append(focus_html)
+
+    if unavailable_sources:
+        section_rows.append(render_unavailable_sources(unavailable_sources))
 
     body_html = "".join(section_rows) or (
         f"<tr><td style=\"padding: 24px; color: {DMAC_MUTED};\">"

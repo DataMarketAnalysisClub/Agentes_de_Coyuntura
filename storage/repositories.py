@@ -26,18 +26,28 @@ class MarketSnapshotRepository:
             )
 
 
-    def last_valid_prices(self, since: datetime) -> dict[str, tuple[float, datetime]]:
-        """Ultimo precio no nulo por simbolo desde `since`, con su timestamp."""
+    def last_valid_prices(self, since: datetime) -> dict[str, MarketSnapshot]:
+        """Ultimo snapshot con precio no nulo por simbolo desde `since`."""
         with get_connection() as connection:
             rows = connection.execute(
                 """
-                SELECT symbol, price, timestamp FROM market_snapshots
+                SELECT timestamp, symbol, name, price, change_pct, source FROM market_snapshots
                 WHERE price IS NOT NULL AND timestamp >= ?
                 ORDER BY timestamp
                 """,
                 (_iso(since),),
             ).fetchall()
-        return {row["symbol"]: (row["price"], datetime.fromisoformat(row["timestamp"])) for row in rows}
+        return {
+            row["symbol"]: MarketSnapshot(
+                datetime.fromisoformat(row["timestamp"]),
+                row["symbol"],
+                row["name"],
+                row["price"],
+                row["change_pct"],
+                row["source"],
+            )
+            for row in rows
+        }
 
 
 class NewsRepository:

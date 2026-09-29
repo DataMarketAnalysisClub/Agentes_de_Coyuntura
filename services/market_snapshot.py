@@ -1,7 +1,8 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 from app.config import get_settings
 from data_sources.bcentral_client import BCentralClient
@@ -28,6 +29,62 @@ def expected_market_symbols() -> list[str]:
         *(symbol for symbol, _, _ in BCENTRAL_FX_SERIES),
         *MACRO_INDICATOR_SYMBOLS,
     ]
+
+
+# Antiguedad maxima del ultimo dato valido que se muestra cuando una fuente
+# no trae datos hoy (rotulado con su fecha en el correo).
+LAST_GOOD_MAX_AGE_DAYS = 5
+
+
+def market_display_names(snapshots: list[MarketSnapshot] = ()) -> dict[str, str]:
+    """Nombre legible por simbolo esperado (para avisos al lector)."""
+    names = {asset.symbol: asset.name for asset in DEFAULT_ASSETS}
+    names.update({symbol: name for symbol, name, _ in BCENTRAL_FX_SERIES})
+    names.update({"TPM": "TPM Chile", "IPC": "IPC / Inflacion Chile", "DESEMPLEO": "Desempleo Chile"})
+    names.update({snapshot.symbol: snapshot.name for snapshot in snapshots if snapshot.name})
+    return names
+
+
+def with_last_good_prices(
+    snapshots: list[MarketSnapshot],
+    last_good: dict[str, MarketSnapshot],
+    now: datetime,
+    expected_symbols: list[str] | None = None,
+) -> tuple[list[MarketSnapshot], set[str]]:
+    """Completa simbolos sin precio con su ultimo dato valido reciente, rotulado.
+
+    Devuelve (snapshots para mostrar, simbolos completados). El dato viejo
+    solo trae precio: sin variacion ni historia, y con `as_of` para que el
+    correo muestre su fecha. Es solo para mostrar: no se debe persistir ni
+    entregar a la IA como si fuera de hoy.
+    """
+    min_timestamp = now - timedelta(days=LAST_GOOD_MAX_AGE_DAYS)
+    by_symbol = {snapshot.symbol: snapshot for snapshot in snapshots}
+    order = list(dict.fromkeys([*(expected_symbols or []), *by_symbol]))
+    display: list[MarketSnapshot] = []
+    covered: set[str] = set()
+    for symbol in order:
+        current = by_symbol.get(symbol)
+        if current is not None and current.price is not None:
+            display.append(current)
+            continue
+        stored = last_good.get(symbol)
+        if stored is not None and stored.timestamp >= min_timestamp:
+            display.append(
+                MarketSnapshot(
+                    timestamp=current.timestamp if current else now,
+                    symbol=symbol,
+                    name=(current.name if current else "") or stored.name,
+                    price=stored.price,
+                    change_pct=None,
+                    source=stored.source,
+                    as_of=stored.timestamp,
+                )
+            )
+            covered.add(symbol)
+        elif current is not None:
+            display.append(current)
+    return display, covered
 
 
 class MarketQuoteClient(Protocol):
@@ -182,7 +239,18 @@ def _build_market_client() -> MarketQuoteClient:
     return YFinanceClient()
 
 
+CHILE_TZ = ZoneInfo("America/Santiago")
+
+
+def format_as_of(snapshot: MarketSnapshot) -> str:
+    """Rotulo "al DD-MM" (hora de Chile) para un ultimo dato valido, o ''."""
+    if snapshot.as_of is None:
+        return ""
+    return f"al {snapshot.as_of.astimezone(CHILE_TZ):%d-%m}"
+
+
 def format_market_line(snapshot: MarketSnapshot) -> str:
     price = "s/d" if snapshot.price is None else f"{snapshot.price:,.2f}"
     change = "s/d" if snapshot.change_pct is None else f"{snapshot.change_pct:+.2f}%"
-    return f"{snapshot.name}: {price} ({change})"
+    as_of = format_as_of(snapshot)
+    return f"{snapshot.name}: {price} ({as_of or change})"

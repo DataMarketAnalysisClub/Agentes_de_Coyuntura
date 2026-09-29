@@ -9,9 +9,19 @@ from app.config import Settings, get_settings
 from data_sources.chile_news_client import ChileNewsClient
 from data_sources.rss_news_client import RawNewsItem, RssNewsClient
 from services.impact_scoring import with_impact_scores
-from services.market_snapshot import MarketSnapshotService, expected_market_symbols
+from services.market_snapshot import (
+    MarketSnapshotService,
+    expected_market_symbols,
+    market_display_names,
+    with_last_good_prices,
+)
 from services.news_classifier import classify_news
-from services.source_health import SourceCheck, check_market_snapshots, check_news_sources
+from services.source_health import (
+    SourceCheck,
+    check_market_snapshots,
+    check_news_sources,
+    unavailable_for_readers,
+)
 from services.source_health_report import notify_transitions, record_health
 from storage.database import init_db
 from storage.models import MarketSnapshot, NewsItem
@@ -34,6 +44,11 @@ class CollectionResult:
     snapshots: list[MarketSnapshot]
     news: list[NewsItem]
     health: list[SourceCheck] = field(default_factory=list)
+    # Para el correo: `snapshots` + ultimo dato valido rotulado donde hoy no
+    # hubo datos. No entregar a la IA (lo presentaria como dato de hoy).
+    display_snapshots: list[MarketSnapshot] = field(default_factory=list)
+    # Fuentes sin datos en esta edicion, por nombre (linea para el lector).
+    unavailable: list[str] = field(default_factory=list)
 
 
 def collect_market_and_news(news_hours: int) -> tuple[list[MarketSnapshot], list[NewsItem]]:
@@ -67,8 +82,15 @@ def collect_market_and_news_with_health(news_hours: int) -> CollectionResult:
 
     raw_news = rss_news + chile_news
     expected_sources = [feed.source for feed in rss_client.configured_feeds()] + list(ChileNewsClient.SOURCE_NAMES)
-    # Antes de guardar: los precios previos son la referencia de plausibilidad.
-    health = _evaluate_health(raw_news, expected_sources, snapshots)
+    # Antes de guardar: los precios previos son la referencia de plausibilidad
+    # y el respaldo rotulado para simbolos que hoy no trajeron datos.
+    last_good = _last_good_prices()
+    health = _evaluate_health(raw_news, expected_sources, snapshots, last_good)
+    display_snapshots, covered = with_last_good_prices(
+        snapshots, last_good, datetime.now(UTC), expected_market_symbols()
+    )
+    names = market_display_names(snapshots)
+    unavailable = [names.get(source, source) for source in unavailable_for_readers(health, covered)]
     MarketSnapshotRepository().save_many(snapshots)
 
     logger.info("Total raw news items", extra={"count": len(raw_news)})
@@ -96,20 +118,30 @@ def collect_market_and_news_with_health(news_hours: int) -> CollectionResult:
         extra={"total": len(scored), "high_impact": len(high_impact)},
     )
 
-    return CollectionResult(snapshots, scored, health)
+    return CollectionResult(snapshots, scored, health, display_snapshots, unavailable)
+
+
+def _last_good_prices() -> dict[str, MarketSnapshot]:
+    since = datetime.now(UTC) - timedelta(days=PREVIOUS_PRICE_LOOKBACK_DAYS)
+    try:
+        return MarketSnapshotRepository().last_valid_prices(since)
+    except Exception:
+        logger.warning("Failed to read last valid prices", exc_info=True)
+        return {}
 
 
 def _evaluate_health(
     raw_news: list[RawNewsItem],
     expected_sources: list[str],
     snapshots: list[MarketSnapshot],
+    last_good: dict[str, MarketSnapshot] | None = None,
 ) -> list[SourceCheck]:
     """Evalua y registra la salud de fuentes; nunca interrumpe el brief."""
     now = datetime.now(UTC)
     try:
-        previous = MarketSnapshotRepository().last_valid_prices(now - timedelta(days=PREVIOUS_PRICE_LOOKBACK_DAYS))
+        previous_prices = {symbol: stored.price for symbol, stored in (last_good or {}).items()}
         checks = check_news_sources(raw_news, expected_sources, now) + check_market_snapshots(
-            snapshots, expected_market_symbols(), {symbol: price for symbol, (price, _) in previous.items()}
+            snapshots, expected_market_symbols(), previous_prices
         )
         transitions = record_health(checks, now)
         notify_transitions(transitions, checks)

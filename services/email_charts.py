@@ -23,6 +23,7 @@ from services.email_formatter import (
     _format_price,
     _normalize_url,
 )
+from services.market_snapshot import format_as_of
 from services.news_charts import NewsChart
 from storage.models import MarketSnapshot
 
@@ -227,6 +228,11 @@ def render_assets_table(snapshots: list[MarketSnapshot]) -> str:
         if snap.price is None and snap.change_pct is None:
             continue
         price = _format_price(snap.price)
+        as_of = format_as_of(snap)
+        if as_of:
+            # Ultimo dato valido (la fuente no trajo datos hoy): se rotula con
+            # su fecha para no presentarlo como precio actual.
+            price += f'<div style="font-size: 10px; color: {DMAC_MUTED};">{escape(as_of)}</div>'
         change = "s/d" if snap.change_pct is None else f"{snap.change_pct:+.2f}%"
         change_color = _color_for_change(snap.change_pct)
         source = escape(snap.source or "-")

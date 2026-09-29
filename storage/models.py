@@ -13,6 +13,9 @@ class MarketSnapshot:
     # Cierres diarios recientes (antiguo -> reciente) para graficos del correo.
     # Solo en memoria: no se persiste en SQLite.
     history: tuple[float, ...] = field(default=(), compare=False, repr=False)
+    # Solo para mostrar: si no es None, `price` es el ultimo dato valido
+    # guardado en esa fecha (la fuente no trajo datos hoy). Nunca se persiste.
+    as_of: datetime | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
