@@ -123,13 +123,51 @@ un entorno local nuevo).
 
 ## Correo y datos: hallazgos del 2026-09-29
 
-1. **Brent -8.46% en el dia con +6.5% en el mes**: probable cambio de
-   contrato de `BZ=F` a fin de mes en Yahoo; revisar tambien `CL=F`, `HG=F`,
-   `GC=F`. La salud de fuentes no lo detecta (umbral de salto 25%).
+1. ~~Brent -8.46%~~: resuelto. Era el cambio de contrato de `BZ=F`; los
+   futuros `=F` usan ahora el contrato vigente (`underlyingSymbol`).
 2. **Router de temas IA**: respuesta vacia intermitente para una region
    (`Strict JSON parse failed ... char 0`); el pipeline continua sin ella.
-3. **Correo**: sin scroll desde ~340 px; a 320 px desborda ~22 px. Validar en
-   clientes reales (Outlook PC, Gmail, telefonos) con el correo "[PRUEBA]".
+3. ~~Correo en telefonos y clientes reales~~: resuelto con el diseno
+   Editorial (columnas fluidas, solo claro, logo embebido); el usuario lo
+   valido en Outlook el 2026-09-29.
+4. **Nix**: escribe codigos ("USDCLP", "US30Y") que ahora llegan al asunto,
+   y viñetas con prefijos rotos ("Posible que..."). Ajustar el prompt para
+   nombres legibles ("dolar", "USD/CLP") y frases completas.
+
+## Desarrollos futuros: mailing con suscripcion (MySQL)
+
+Hoy los destinatarios son una lista fija en `EMAIL_TO` (desde el
+2026-09-29 solo `dmac@udd.cl`). Objetivo: que cualquier persona se inscriba
+y se desinscriba sola, con los correos en una base MySQL.
+
+1. **Base de datos.** MySQL (servicio nuevo en `docker-compose.yml`, volumen
+   propio y respaldo en `~/backups`). Tabla `subscribers`: `id`, `email`
+   (unico, normalizado a minusculas), `status` (`pending`, `active`,
+   `unsubscribed`), `token` (aleatorio, para confirmar y desinscribirse),
+   `created_at`, `confirmed_at`, `unsubscribed_at`, `source`. Credenciales
+   por `.env` (`MYSQL_*`), nunca en el repo. La SQLite actual sigue para
+   snapshots, noticias y auditoria de envios.
+2. **Inscripcion con doble confirmacion.** Formulario -> fila `pending` ->
+   correo con link de confirmacion -> `active`. Evita inscribir correos
+   ajenos y mejora la entrega (menos spam).
+3. **Desinscripcion automatica.** Link en el pie de cada correo con el token
+   del destinatario (un clic, sin login) y cabeceras `List-Unsubscribe` y
+   `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058), que Gmail
+   y Outlook muestran como boton "Cancelar suscripcion".
+4. **Envio.** `EmailSender` toma los `active` de MySQL en vez de `EMAIL_TO`
+   y envia un correo por destinatario (el link de baja es personal; nunca
+   exponer la lista en To/Cc). Cuidar los limites diarios del SMTP (Gmail
+   personal ~500/dia): con el SMTP institucional de la UDD, cuando exista.
+   `OPS_EMAIL_TO` y las pruebas siguen fuera de la lista.
+5. **Endpoint web minimo** para confirmar/desinscribir (y el formulario, o
+   un formulario externo que llame a la API). `AGENTS.md` pide evitar
+   frameworks web en el MVP salvo requerimiento explicito: este lo es, pero
+   conviene algo pequeno y aislado, expuesto con HTTPS.
+6. **Datos personales.** Guardar solo el correo y fechas; politica de
+   privacidad y finalidad visibles al inscribirse (ley chilena de proteccion
+   de datos personales). Registrar altas y bajas para auditoria.
+7. **Tests** de alta, confirmacion, baja idempotente, token invalido y que
+   un `unsubscribed` nunca reciba el correo.
 
 ## CI/CD
 

@@ -1,4 +1,4 @@
-# Handoff: sesion 2026-09-29 (tarde, segunda parte)
+# Handoff: sesion 2026-09-29 (cierre)
 
 Estado completo para retomar el trabajo en otra sesion. Detalle de cambios
 en `CHANGELOG.md` ("Unreleased") y backlog tecnico en `NEXT_STEPS.md`.
@@ -79,6 +79,8 @@ corre produccion.
 
 - Produccion con `239704e`: 17/17 yfinance, todas las series BCCh con dato,
   Brent -1,07%, correo "[PRUEBA]" enviado a brcarom@udd.cl (68 KB).
+- Produccion con `3bc3087` (asunto con titular, logo embebido): correo
+  "[PRUEBA]" recibido bien en `dmac@udd.cl` (69 KB), todas las fuentes ok.
 - Local: capturas Chromium en 1200, 390 y 320 px. Solo
   claro el correo pesa ~68 KB (limite de recorte de Gmail ~102 KB).
 
@@ -107,12 +109,11 @@ corre produccion.
 
 ## Trabajo pendiente (en orden sugerido)
 
-1. **Revisar en clientes reales** (Outlook nuevo claro/oscuro, Outlook y
-   Gmail en el celular) el logo embebido, la vista previa y el remitente.
-   Si el logo embebido falla en algun cliente, volver a URL con
-   `EMAIL_LOGO_URL=https://...`.
-2. **Revisar el cierre de las 18:30 del 2026-09-29** (primer envio real con
-   todo lo nuevo): `docker compose logs --since 1h dmac-market-brief-agent`
+1. **Revisar Gmail y el celular**: Outlook nuevo (claro y oscuro) ya fue
+   validado por el usuario. Si el logo embebido falla en algun cliente,
+   volver a URL con `EMAIL_LOGO_URL=https://...`.
+2. **Revisar el cierre de las 18:30 del 2026-09-29** (primer envio real a
+   `dmac@udd.cl` con todo lo nuevo): `docker compose logs --since 1h dmac-market-brief-agent`
    y `python -m app.main health` en el servidor.
 3. **Remitente institucional**: el correo sale de una cuenta Gmail
    personal; Outlook UDD lo marca "remitente externo" y bloquea imagenes
@@ -124,10 +125,16 @@ corre produccion.
    y `LOW_VALUE_PATTERNS` por substring e incluyen el nombre de la fuente.
    `impact_scoring` suma +1 a Latam/EE.UU./Global pero no a Chile.
    La nota de DF del dolar quedo como region "EE.UU." en un envio anterior.
-6. **Nix**: viñetas con prefijos gramaticalmente rotos ("Posible que...",
+6. **Nix**: escribe codigos ("USDCLP", "US30Y") que ahora llegan al asunto;
+   viñetas con prefijos gramaticalmente rotos ("Posible que...",
    "Preliminar que...") y hechos copiados en ingles; hoy se ocultan las
    viñetas si hay parrafos, pero conviene corregir el prompt.
 7. **Salud de fuentes**: calibrar umbrales tras ~2 semanas mirando `health`.
-8. Backlog de `NEXT_STEPS.md`: GET condicional, monitor mas liviano,
+8. **Mailing con suscripcion (desarrollo futuro)**: base MySQL con los
+   correos inscritos, doble confirmacion, desinscripcion automatica (link
+   personal + `List-Unsubscribe` de un clic) y envio a los `active` en vez
+   de `EMAIL_TO`. Diseno en `NEXT_STEPS.md` ("Desarrollos futuros").
+   Conviene hacerlo junto con el SMTP institucional de la UDD.
+9. Backlog de `NEXT_STEPS.md`: GET condicional, monitor mas liviano,
    deduplicacion O(n^2), paso (b) de IA en "En foco", proteger `main`
    exigiendo CI verde.
