@@ -622,8 +622,38 @@ def _footer_html() -> str:
         f"<p style=\"margin: 10px 0 0 0; font-size: 13px; color: {DMAC_MUTED}; line-height: 1.5;\">"
         f"<strong style=\"color: {DMAC_TEXT};\">Nix Assistant, DMAC UDD</strong> &middot; Equipo de Datos y Coyuntura"
         f" &middot; &copy; {year} Data Market Analysis Club UDD</p>"
+        f"{UNSUBSCRIBE_BLOCK_START}"
+        f"<p style=\"margin: 10px 0 0 0; font-size: 13px; color: {DMAC_MUTED}; line-height: 1.5;\">"
+        "Recibes este correo porque te inscribiste en DMAC Brief."
+        f" <a href=\"{UNSUBSCRIBE_URL_PLACEHOLDER}\" style=\"color: {DMAC_MUTED}; text-decoration: underline;\">"
+        "Cancelar suscripción</a></p>"
+        f"{UNSUBSCRIBE_BLOCK_END}"
         "</td></tr>"
     )
+
+
+# Link de baja del pie. El HTML sale con el marcador y `EmailSender` pone el
+# link personal de cada suscriptor o quita el bloque (envios a EMAIL_TO,
+# avisos a mantenedores, correos de confirmacion).
+UNSUBSCRIBE_URL_PLACEHOLDER = "%%DMAC_UNSUBSCRIBE_URL%%"
+UNSUBSCRIBE_BLOCK_START = "<!--dmac-unsubscribe-->"
+UNSUBSCRIBE_BLOCK_END = "<!--/dmac-unsubscribe-->"
+_UNSUBSCRIBE_BLOCK_RE = re.compile(
+    re.escape(UNSUBSCRIBE_BLOCK_START) + ".*?" + re.escape(UNSUBSCRIBE_BLOCK_END), re.DOTALL
+)
+
+
+def with_unsubscribe_link(html_body: str, url: str | None) -> str:
+    """Pone el link de baja personal en el pie, o quita el bloque si no hay."""
+    if not url:
+        return _UNSUBSCRIBE_BLOCK_RE.sub("", html_body)
+    return html_body.replace(UNSUBSCRIBE_URL_PLACEHOLDER, escape(url, quote=True))
+
+
+def text_with_unsubscribe_link(text_body: str, url: str | None) -> str:
+    if not url:
+        return text_body
+    return f"{text_body.rstrip()}\n\n--\nCancelar suscripción: {url}\n"
 
 
 def _build_intro_paragraph(intro_lines: list[str], brief_kind: str) -> str:
