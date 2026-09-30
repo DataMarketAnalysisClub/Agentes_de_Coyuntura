@@ -146,8 +146,9 @@ Pendientes:
 1. **Activar en produccion** (DEPLOY.md, pasos 1-5): `.env`, Funnel,
    prueba de alta/confirmacion/baja desde un telefono sin Tailscale y
    `subscribers add dmac@udd.cl` antes de `MAILING_ENABLED=true`.
-2. **DDL de MySQL no probado en vivo**: los tests corren el SQL sobre SQLite.
-   Al primer arranque revisar `docker compose logs dmac-subscriptions`.
+2. ~~DDL de MySQL no probado en vivo~~: verificado el 2026-09-30 en nixbox
+   con un MySQL 8.4 desechable y la imagen desplegada (esquema idempotente,
+   alta/confirmacion/baja/borrado, token sensible a mayusculas, duplicados).
 3. **SMTP institucional de la UDD** antes de ~200 suscriptores (Gmail
    personal ~500 destinatarios/dia; cada suscriptor recibe 2 correos).
 4. **Difusion**: la URL de Funnel (`nixbox.<tailnet>.ts.net`) expone el

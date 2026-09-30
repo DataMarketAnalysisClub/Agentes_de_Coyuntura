@@ -69,8 +69,13 @@ Microsoft Forms). Implementado y apagado por defecto: sin
   baja y `List-Unsubscribe`; si MySQL falla, va a `EMAIL_TO`.
 - CLI `python -m app.main subscribers count|list|add|remove|erase`.
 - `scripts/deploy.sh` hace `mysqldump` a `~/backups` si `mysql` corre.
-- 379 tests (43 nuevos). El DDL de MySQL no se probo en vivo (sin Docker ni
-  MySQL en la maquina de desarrollo).
+- 379 tests (43 nuevos). DDL y flujo verificados en nixbox contra un MySQL
+  8.4 desechable (ya eliminado; queda la imagen `mysql:8.4` descargada).
+- Desplegado `6b088ce` el 2026-09-30 (respaldo
+  `~/backups/dmac-20260930-203636.tgz`) con el mailing apagado. Envios del 29
+  y 30 (manana y cierre) salieron `sent`, todas las fuentes `ok`.
+- URL publica prevista: `https://nixbox.tailce797f.ts.net`. El tailnet aun
+  no tiene HTTPS (`CertDomains` vacio): habilitarlo en la consola.
 - Activacion paso a paso: DEPLOY.md, "Mailing con suscripcion".
 
 ## Que se hizo el 2026-09-29 (tarde)
