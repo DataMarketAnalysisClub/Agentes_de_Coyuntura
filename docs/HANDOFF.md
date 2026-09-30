@@ -1,4 +1,4 @@
-# Handoff: sesion 2026-09-29 (cierre)
+# Handoff: sesion 2026-09-30
 
 Estado completo para retomar el trabajo en otra sesion. Detalle de cambios
 en `CHANGELOG.md` ("Unreleased") y backlog tecnico en `NEXT_STEPS.md`.
@@ -52,9 +52,28 @@ corre produccion.
   `EMAIL_ENABLED=false`, IA apagada. Nunca imprimir su contenido.
 - Los tests ignoran el `.env` (fixture en `tests/conftest.py`).
 - `mise exec python@3.11 -- python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`;
-  `.venv/bin/python -m pytest -q` (332 tests) y `.venv/bin/ruff check .`.
+  `.venv/bin/python -m pytest -q` (379 tests) y `.venv/bin/ruff check .`.
 
-## Que se hizo hoy (2026-09-29, tarde)
+## Que se hizo el 2026-09-30: mailing con suscripcion (sin activar)
+
+Decision del usuario: servicio web propio + Tailscale Funnel (no Google o
+Microsoft Forms). Implementado y apagado por defecto: sin
+`COMPOSE_PROFILES=mailing` y `MAILING_ENABLED=true` produccion no cambia.
+
+- MySQL 8.4 (contenedor `mysql`, volumen `mysql-data`) con `subscribers` y
+  `subscriber_events` (`storage/subscribers.py`).
+- `app/subscription_server.py` (`python -m app.main web`, contenedor
+  `dmac-subscriptions` en `127.0.0.1:8080`): formulario, doble confirmacion,
+  baja por link y de un clic (RFC 8058). Confirmar/bajar solo por POST.
+- `EmailSender`: con mailing, un correo por suscriptor activo con link de
+  baja y `List-Unsubscribe`; si MySQL falla, va a `EMAIL_TO`.
+- CLI `python -m app.main subscribers count|list|add|remove|erase`.
+- `scripts/deploy.sh` hace `mysqldump` a `~/backups` si `mysql` corre.
+- 379 tests (43 nuevos). El DDL de MySQL no se probo en vivo (sin Docker ni
+  MySQL en la maquina de desarrollo).
+- Activacion paso a paso: DEPLOY.md, "Mailing con suscripcion".
+
+## Que se hizo el 2026-09-29 (tarde)
 
 1. **Brent -8%**: era el cambio de contrato de `BZ=F` (nov -> dic). El
    cliente de yfinance ahora usa el contrato vigente (`underlyingSymbol`)
@@ -109,6 +128,8 @@ corre produccion.
   algo demostrable y en uso; por ahora sigue la cuenta Gmail.
 - IPSA desde yfinance con `MXIPSAGC.SN` (aprobado 2026-09-29). No buscar
   otra fuente salvo que Yahoo deje de publicarlo.
+- Mailing: servicio web propio publicado con Tailscale Funnel, con doble
+  confirmacion y baja de un clic (2026-09-30). No usar formularios externos.
 
 ## Trabajo pendiente (en orden sugerido)
 
@@ -133,11 +154,11 @@ corre produccion.
    "Preliminar que...") y hechos copiados en ingles; hoy se ocultan las
    viñetas si hay parrafos, pero conviene corregir el prompt.
 7. **Salud de fuentes**: calibrar umbrales tras ~2 semanas mirando `health`.
-8. **Mailing con suscripcion (desarrollo futuro)**: base MySQL con los
-   correos inscritos, doble confirmacion, desinscripcion automatica (link
-   personal + `List-Unsubscribe` de un clic) y envio a los `active` en vez
-   de `EMAIL_TO`. Diseno en `NEXT_STEPS.md` ("Desarrollos futuros").
-   Conviene hacerlo junto con el SMTP institucional de la UDD.
+8. **Activar el mailing con suscripcion**: implementado el 2026-09-30,
+   falta DEPLOY.md "Mailing con suscripcion" (pasos 1-5: `.env`, Funnel,
+   prueba desde un telefono, `subscribers add dmac@udd.cl`, encender).
+   Conviene junto con el SMTP institucional de la UDD. Pendientes en
+   `NEXT_STEPS.md`.
 9. Backlog de `NEXT_STEPS.md`: GET condicional, monitor mas liviano,
    deduplicacion O(n^2), paso (b) de IA en "En foco", proteger `main`
    exigiendo CI verde.

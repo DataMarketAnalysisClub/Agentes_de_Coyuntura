@@ -17,6 +17,8 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
   Render JS-free, compatibles con todos los clientes.
 - Persistencia auditable en SQLite.
 - Envio SMTP opcional con `DRY_RUN` por defecto.
+- Mailing con suscripcion (opcional): altas con doble confirmacion, bajas de
+  un clic y lista en MySQL (ver "Mailing con suscripcion").
 - Tolerancia a fallas de APIs externas.
 - Scheduler interno con APScheduler.
 - Docker y Docker Compose.
@@ -35,7 +37,8 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 - `services/`: logica de negocio, scoring, clasificacion, formatos, email e IA.
 - `services/ai/`: cliente Ollama Cloud, schemas, prompts y validacion JSON.
 - `jobs/`: Morning Brief, Market Close y monitor de alertas.
-- `storage/`: SQLite, modelos y repositorios.
+- `storage/`: SQLite, modelos y repositorios; `storage/subscribers.py` es la
+  lista de suscriptores en MySQL.
 - `prompts/`: guias editoriales y prompts para agentes IA.
 - `prompts/ai/`: prompts operativos para Ollama Cloud.
 - `outputs/`: briefs, alertas y artefactos IA generados.
@@ -247,6 +250,8 @@ Compara el fallback deterministico contra uno o varios modelos Ollama Cloud sobr
 
 ```bash
 .venv/bin/python -m app.main ai-review-compare
+.venv/bin/python -m app.main web                        # servicio de suscripcion
+.venv/bin/python -m app.main subscribers count          # lista de suscriptores (MySQL)
 ```
 
 Variables opcionales:
@@ -371,6 +376,8 @@ No copies el contenido de ese archivo a Git ni a mensajes de error.
 .venv/bin/python -m app.main ai-review
 .venv/bin/python -m app.main ai-review-fast
 .venv/bin/python -m app.main ai-review-compare
+.venv/bin/python -m app.main web                        # servicio de suscripcion
+.venv/bin/python -m app.main subscribers count          # lista de suscriptores (MySQL)
 ```
 
 Los archivos se guardan en:
@@ -481,6 +488,62 @@ Para RSS, puedes usar `RSS_FEEDS` en `.env` con URLs separadas por coma.
 5. Mantén `ALERT_MONITOR_ENABLED=false` salvo que se requieran alertas manualmente.
 
 Nunca imprimas ni commitees credenciales.
+
+## Mailing con suscripcion
+
+Apagado por defecto (`MAILING_ENABLED=false`): el brief va a `EMAIL_TO`.
+Encendido, cualquier persona se inscribe y se da de baja sola, y el brief va
+a cada suscriptor `active`, un correo por persona.
+
+| Pieza | Donde |
+|---|---|
+| Lista de correos (`subscribers`) e historial de altas/bajas (`subscriber_events`) | MySQL 8.4, contenedor `mysql`, volumen `mysql-data` |
+| Formulario, confirmacion y baja | `app/subscription_server.py` (`python -m app.main web`), contenedor `dmac-subscriptions` |
+| Reglas de alta, confirmacion y baja | `services/subscriptions.py` |
+| Envio personalizado | `services/email_sender.py` |
+| URL publica HTTPS | Tailscale Funnel hacia `127.0.0.1:8080` del servidor |
+
+Flujo:
+
+1. **Alta**: el formulario (`/`) crea la fila `pending` con un token aleatorio y
+   envia un correo con el link `/confirmar?t=...`. La respuesta es la misma
+   exista o no el correo (no revela quien esta inscrito).
+2. **Confirmacion**: el link abre una pagina con un boton; el POST pasa la fila
+   a `active`. El link vence a los `MAILING_CONFIRM_TTL_DAYS` dias (7).
+3. **Envio**: los jobs no cambian. `EmailSender` lee los `active` al momento de
+   enviar, asi que una alta o baja rige desde el siguiente envio sin reiniciar
+   nada. Cada correo lleva el link de baja personal en el pie y las cabeceras
+   `List-Unsubscribe` + `List-Unsubscribe-Post` (RFC 8058), que Gmail y
+   Outlook muestran como boton "Cancelar suscripcion".
+4. **Baja**: el link del pie abre una pagina con boton; el boton del cliente de
+   correo hace el POST directo. La baja es inmediata e idempotente.
+
+Confirmar y dar de baja exigen POST porque los antivirus de correo (Outlook
+Safe Links) abren los links con GET. Los avisos a mantenedores
+(`OPS_EMAIL_TO`), los correos de prueba con `recipients=[...]` y los envios a
+`EMAIL_TO` nunca usan la lista ni llevan link de baja. Si MySQL no responde al
+enviar, el brief va a `EMAIL_TO` y queda un error en el log.
+
+Frenos: un correo de confirmacion por direccion cada
+`MAILING_CONFIRM_RESEND_MINUTES` (10) y `MAILING_CONFIRM_MAX_PER_HOUR` (60) en
+total, un campo trampa para bots y cuerpos de maximo 4 KB. Datos personales:
+solo correo, estado y fechas (sin IP ni nombre); el formulario muestra la
+finalidad y el contacto (`OPS_EMAIL_TO`).
+
+Administracion (dentro del contenedor):
+
+```bash
+python -m app.main subscribers count
+python -m app.main subscribers list active
+python -m app.main subscribers add dmac@udd.cl      # alta directa, sin confirmacion
+python -m app.main subscribers remove correo@x.cl   # baja
+python -m app.main subscribers erase correo@x.cl    # borra el correo y su historial
+```
+
+Activacion en produccion: ver [DEPLOY.md](DEPLOY.md), "Mailing con
+suscripcion". Los tests corren el SQL del repositorio sobre SQLite
+(`tests/conftest.py`); el DDL de MySQL (`MYSQL_SCHEMA`) se prueba al levantar
+el contenedor.
 
 ## GitHub
 

@@ -134,40 +134,28 @@ un entorno local nuevo).
    y viñetas con prefijos rotos ("Posible que..."). Ajustar el prompt para
    nombres legibles ("dolar", "USD/CLP") y frases completas.
 
-## Desarrollos futuros: mailing con suscripcion (MySQL)
+## Mailing con suscripcion (MySQL): implementado, falta activarlo
 
-Hoy los destinatarios son una lista fija en `EMAIL_TO` (desde el
-2026-09-29 solo `dmac@udd.cl`). Objetivo: que cualquier persona se inscriba
-y se desinscriba sola, con los correos en una base MySQL.
+Implementado el 2026-09-30 y apagado por defecto (ver README "Mailing con
+suscripcion" y DEPLOY.md para activarlo). Decision del usuario: servicio web
+propio publicado con Tailscale Funnel (no Google/Microsoft Forms), para tener
+doble confirmacion y baja de un clic.
 
-1. **Base de datos.** MySQL (servicio nuevo en `docker-compose.yml`, volumen
-   propio y respaldo en `~/backups`). Tabla `subscribers`: `id`, `email`
-   (unico, normalizado a minusculas), `status` (`pending`, `active`,
-   `unsubscribed`), `token` (aleatorio, para confirmar y desinscribirse),
-   `created_at`, `confirmed_at`, `unsubscribed_at`, `source`. Credenciales
-   por `.env` (`MYSQL_*`), nunca en el repo. La SQLite actual sigue para
-   snapshots, noticias y auditoria de envios.
-2. **Inscripcion con doble confirmacion.** Formulario -> fila `pending` ->
-   correo con link de confirmacion -> `active`. Evita inscribir correos
-   ajenos y mejora la entrega (menos spam).
-3. **Desinscripcion automatica.** Link en el pie de cada correo con el token
-   del destinatario (un clic, sin login) y cabeceras `List-Unsubscribe` y
-   `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058), que Gmail
-   y Outlook muestran como boton "Cancelar suscripcion".
-4. **Envio.** `EmailSender` toma los `active` de MySQL en vez de `EMAIL_TO`
-   y envia un correo por destinatario (el link de baja es personal; nunca
-   exponer la lista en To/Cc). Cuidar los limites diarios del SMTP (Gmail
-   personal ~500/dia): con el SMTP institucional de la UDD, cuando exista.
-   `OPS_EMAIL_TO` y las pruebas siguen fuera de la lista.
-5. **Endpoint web minimo** para confirmar/desinscribir (y el formulario, o
-   un formulario externo que llame a la API). `AGENTS.md` pide evitar
-   frameworks web en el MVP salvo requerimiento explicito: este lo es, pero
-   conviene algo pequeno y aislado, expuesto con HTTPS.
-6. **Datos personales.** Guardar solo el correo y fechas; politica de
-   privacidad y finalidad visibles al inscribirse (ley chilena de proteccion
-   de datos personales). Registrar altas y bajas para auditoria.
-7. **Tests** de alta, confirmacion, baja idempotente, token invalido y que
-   un `unsubscribed` nunca reciba el correo.
+Pendientes:
+
+1. **Activar en produccion** (DEPLOY.md, pasos 1-5): `.env`, Funnel,
+   prueba de alta/confirmacion/baja desde un telefono sin Tailscale y
+   `subscribers add dmac@udd.cl` antes de `MAILING_ENABLED=true`.
+2. **DDL de MySQL no probado en vivo**: los tests corren el SQL sobre SQLite.
+   Al primer arranque revisar `docker compose logs dmac-subscriptions`.
+3. **SMTP institucional de la UDD** antes de ~200 suscriptores (Gmail
+   personal ~500 destinatarios/dia; cada suscriptor recibe 2 correos).
+4. **Difusion**: la URL de Funnel (`nixbox.<tailnet>.ts.net`) expone el
+   nombre del tailnet; un dominio propio del club seria mas presentable.
+5. **Politica de privacidad**: el formulario muestra finalidad y contacto
+   (`OPS_EMAIL_TO`); falta revisarla con el club (ley 19.628 / 21.719).
+6. **Opcional**: aviso a mantenedores con altas/bajas del dia; limpiar filas
+   `pending` vencidas (> 30 dias).
 
 ## CI/CD
 

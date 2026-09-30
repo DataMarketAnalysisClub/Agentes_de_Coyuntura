@@ -1,6 +1,26 @@
 # Changelog
 
-## [Unreleased] - 2026-09-29
+## [Unreleased] - 2026-09-30
+
+### Agregado (mailing con suscripcion, apagado por defecto)
+- Lista de suscriptores en MySQL 8.4 (`storage/subscribers.py`): tablas
+  `subscribers` (correo, estado `pending`/`active`/`unsubscribed`, token,
+  fechas) y `subscriber_events` (historial de altas y bajas).
+- Servicio web minimo con la libreria estandar (`app/subscription_server.py`,
+  `python -m app.main web`): formulario con consentimiento y campo trampa,
+  doble confirmacion, baja por link personal y baja de un clic (RFC 8058).
+  Confirmar y dar de baja exigen POST (los antivirus de correo abren links).
+  Se publica con Tailscale Funnel.
+- `EmailSender` con `MAILING_ENABLED=true`: un correo por suscriptor activo,
+  con link de baja en el pie y cabeceras `List-Unsubscribe`. Si MySQL falla o
+  falta `MAILING_PUBLIC_URL`, envia a `EMAIL_TO`. Los envios a `EMAIL_TO` y a
+  mantenedores quitan el bloque de baja.
+- `python -m app.main subscribers count|list|add|remove|erase`.
+- `docker-compose.yml`: servicios `mysql` y `dmac-subscriptions` en el perfil
+  `mailing` (`COMPOSE_PROFILES=mailing`); sin el perfil nada cambia.
+- `scripts/deploy.sh` respalda la base con `mysqldump` si `mysql` corre.
+- Dependencias: `PyMySQL==1.2.3` y `cryptography==50.0.2` (autenticacion
+  `caching_sha2_password` de MySQL 8).
 
 ### Cambiado (asunto con el titular)
 - El asunto lleva el titular de Nix: "DMAC Brief · 29 sep — <titular>" (y

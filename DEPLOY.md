@@ -224,6 +224,87 @@ Rollback: restaurar ese tar y `docker compose up -d --build`.
   corrida. Sirven como auditoria y referencia. Pueden limpiarse despues de
   confirmar el envio.
 - **Logs**: `logs/*.log` rotar con logrotate o limpiar mensualmente.
+- **Suscriptores (MySQL)**: volumen Docker `mysql-data`, fuera del tar de
+  respaldo; ver "Mailing con suscripcion" para el dump.
+
+## Mailing con suscripcion (MySQL + Tailscale Funnel)
+
+Apagado por defecto: sin estos pasos el servidor sigue enviando a `EMAIL_TO`
+y no levanta contenedores nuevos. Diseno y flujo en el README ("Mailing con
+suscripcion").
+
+### 1. Variables en el `.env` del servidor
+
+Respaldar el `.env` antes de editarlo (`cp .env ~/backups/env-$(date +%Y%m%d-%H%M%S).bak`).
+Generar las contrasenas en el servidor, sin pegarlas en ningun chat:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"   # una para cada una
+```
+
+```ini
+COMPOSE_PROFILES=mailing        # levanta mysql y dmac-subscriptions
+MAILING_ENABLED=false           # aun no: primero probar altas y bajas
+MAILING_PUBLIC_URL=https://nixbox.<tailnet>.ts.net
+MYSQL_PASSWORD=<generada>
+MYSQL_ROOT_PASSWORD=<generada>
+```
+
+`MYSQL_HOST=mysql` y el resto tienen defaults correctos. La contrasena de
+MySQL queda fija en el volumen la primera vez que arranca: cambiarla despues
+en el `.env` no la cambia en la base.
+
+### 2. Desplegar
+
+`scripts/deploy.sh --apply` como siempre. `docker compose ps` debe mostrar
+`dmac-mysql` y `dmac-subscriptions` como `healthy`, y
+`curl -fsS http://127.0.0.1:8080/salud` debe responder `ok` en el servidor.
+
+### 3. Publicar con Tailscale Funnel
+
+Requisitos del tailnet (consola de administracion de Tailscale): HTTPS
+activado y el atributo `funnel` permitido para `nixbox` en la politica de
+acceso. En el servidor:
+
+```bash
+sudo tailscale funnel --bg 8080      # https://nixbox.<tailnet>.ts.net -> 127.0.0.1:8080
+tailscale funnel status
+```
+
+Funnel publica solo ese puerto; MySQL no tiene puertos publicados. La URL que
+muestra `funnel status` es la que va en `MAILING_PUBLIC_URL`.
+
+### 4. Probar antes de encender el envio
+
+1. Abrir la URL publica desde un telefono sin Tailscale, inscribir un correo
+   propio, confirmar desde el correo y revisar
+   `docker compose exec -T dmac-subscriptions python -m app.main subscribers list`.
+2. Sembrar el correo del club: `... python -m app.main subscribers add dmac@udd.cl`.
+3. Correo de prueba al suscriptor (no a la lista), con el mismo script de
+   prueba de siempre pero con `recipients=[...]`, o esperar al paso 5.
+
+### 5. Encender
+
+`MAILING_ENABLED=true` en el `.env` y `docker compose up -d --force-recreate`
+para que el agente lo lea. Desde ese envio el brief va a los `active`; si
+MySQL falla, va a `EMAIL_TO` (dejar `EMAIL_TO=dmac@udd.cl` como respaldo).
+
+Limite: la cuenta Gmail personal admite ~500 destinatarios al dia y cada
+suscriptor cuenta dos veces (manana y cierre). Pasar al SMTP institucional
+de la UDD antes de superar ~200 suscriptores.
+
+### Respaldos y restauracion
+
+`scripts/deploy.sh --apply` guarda `~/backups/mysql-<fecha>.sql.gz` si el
+contenedor `mysql` esta corriendo. A mano:
+
+```bash
+docker compose exec -T mysql sh -c 'exec mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" --single-transaction --databases "$MYSQL_DATABASE"' | gzip > ~/backups/mysql-manual.sql.gz
+gunzip -c ~/backups/mysql-<fecha>.sql.gz | docker compose exec -T mysql sh -c 'exec mysql -u root -p"$MYSQL_ROOT_PASSWORD"'
+```
+
+`docker compose down -v` borra el volumen `mysql-data` (la lista completa):
+no usar `-v`.
 
 ## Configuracion de horario personalizada
 
