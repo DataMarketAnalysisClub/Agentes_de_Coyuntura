@@ -8,7 +8,8 @@
 #
 # Que hace (con --apply):
 #   1. Respaldo completo del directorio remoto en ~/backups (incluye .env,
-#      base SQLite y credenciales; permisos 600).
+#      base SQLite y credenciales; permisos 600) y, si el perfil "mailing"
+#      esta activo, mysqldump de la base de suscriptores.
 #   2. rsync --delete desde `git archive <ref>`: solo codigo commiteado.
 #      Nunca toca .env, storage/*.db, credentials/, outputs/ ni logs/.
 #      Ojo: storage/ tiene codigo (repositories.py, models.py) ademas de la
@@ -62,6 +63,14 @@ echo "== 1. Respaldo =="
 ssh "$HOST" "set -e; mkdir -p ~/backups && chmod 700 ~/backups; \
   tar -czf ~/backups/dmac-$STAMP.tgz -C \"\$(dirname $REMOTE_DIR)\" \"\$(basename $REMOTE_DIR)\"; \
   chmod 600 ~/backups/dmac-$STAMP.tgz; ls -la ~/backups/dmac-$STAMP.tgz"
+# La base del mailing vive en un volumen de Docker (fuera del tar): dump
+# aparte si el contenedor mysql esta corriendo (perfil "mailing").
+ssh "$HOST" "set -eo pipefail; cd $REMOTE_DIR; \
+  if docker compose ps --status running --services 2>/dev/null | grep -qx mysql; then \
+    umask 077; docker compose exec -T mysql sh -c \
+      'exec mysqldump -u root -p\"\$MYSQL_ROOT_PASSWORD\" --single-transaction --databases \"\$MYSQL_DATABASE\"' \
+      | gzip > ~/backups/mysql-$STAMP.sql.gz; ls -la ~/backups/mysql-$STAMP.sql.gz; \
+  fi"
 
 echo "== 2. Sync =="
 rsync "${RSYNC_OPTS[@]}" "$WORKDIR/" "$HOST:$REMOTE_DIR/"

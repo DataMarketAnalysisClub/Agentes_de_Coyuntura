@@ -20,3 +20,60 @@ services:
       retries: 3
       start_period: 1m
     command: ["python", "-m", "app.main", "scheduler"]
+
+  # --- Mailing con suscripcion (perfil "mailing") ---------------------------
+  # Apagado por defecto. Se activa con COMPOSE_PROFILES=mailing en el .env del
+  # servidor (junto a MAILING_ENABLED=true y MYSQL_*); ver DEPLOY.md.
+  mysql:
+    image: mysql:8.4
+    container_name: dmac-mysql
+    profiles: ["mailing"]
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-dmac_mailing}
+      MYSQL_USER: ${MYSQL_USER:-dmac_mailing}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-}
+      TZ: UTC
+    # Volumen con nombre (no carpeta del proyecto): el rsync --delete de
+    # scripts/deploy.sh nunca lo toca. Sin puertos publicados: solo lo ven
+    # los contenedores de este compose.
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  dmac-subscriptions:
+    build: .
+    container_name: dmac-subscriptions
+    profiles: ["mailing"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TZ: ${TZ:-America/Santiago}
+      MAILING_WEB_PORT: "8080"
+    volumes:
+      - ./logs:/app/logs
+      - ./storage:/app/storage
+    # Solo en localhost del servidor: Tailscale Funnel lo publica con HTTPS.
+    ports:
+      - "127.0.0.1:${MAILING_HOST_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/salud"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: ["python", "-m", "app.main", "web"]
+
+volumes:
+  mysql-data:
