@@ -118,3 +118,13 @@ def test_build_email_html_uses_precomputed_news_charts() -> None:
     html = build_email_html("Asunto", "", snapshots=SNAPSHOTS, news_items=NEWS, news_charts=charts)
 
     assert "Lectura precalculada." in html
+
+
+def test_readings_replace_internal_asset_codes() -> None:
+    from services.ai.news_chart_readings import ChartReading, ChartReadingsResponse, _valid_readings
+
+    response = ChartReadingsResponse(readings=[
+        ChartReading(symbol="COPPER", reading="COPPER coincide con  el alza del USDCLP"),
+    ])
+
+    assert _valid_readings(response, {"COPPER"}) == {"COPPER": "Cobre coincide con el alza del USD/CLP"}

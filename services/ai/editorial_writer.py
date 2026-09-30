@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from services.ai.chart_renderer import available_chart_ids
+from services.ai.editorial_polish import polish_editorial
 from services.ai.json_validation import JsonValidationError, validate_response
 from services.ai.ollama_client import OllamaCloudClient, OllamaCloudError
 from services.ai.prompt_loader import load_prompt
@@ -127,6 +128,8 @@ def run_editorial_writer(
         response.source_notes = _filter_source_notes(
             response.source_notes, exact_source_names,
         )
+        # Codigos internos ("USDCLP") y prefijos rotos fuera del texto visible.
+        response = polish_editorial(response)
         metadata.validation_status = "ok"
         metadata.output_sections_count = len(response.sections)
         metadata.output_chart_specs_count = len(response.chart_specs)

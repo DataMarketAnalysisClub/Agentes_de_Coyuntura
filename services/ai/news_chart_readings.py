@@ -18,6 +18,7 @@ from dataclasses import replace
 from pydantic import BaseModel, ValidationError
 
 from app.config import Settings, get_settings
+from services.ai.editorial_polish import polish_text
 from services.ai.json_validation import JsonValidationError, validate_response
 from services.ai.ollama_client import OllamaCloudClient, OllamaCloudError
 from services.ai.prompt_loader import load_prompt
@@ -98,7 +99,7 @@ def _valid_readings(response: ChartReadingsResponse, candidates: set[str]) -> di
     readings: dict[str, str] = {}
     for item in response.readings:
         symbol = item.symbol.strip().upper()
-        text = re.sub(r"\s+", " ", item.reading).strip()
+        text = polish_text(re.sub(r"\s+", " ", item.reading).strip())
         if symbol not in candidates:
             logger.warning("Discarding chart reading for non-candidate asset", extra={"symbol": symbol})
             continue

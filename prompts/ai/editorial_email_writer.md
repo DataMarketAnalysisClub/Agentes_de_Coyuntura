@@ -32,6 +32,8 @@ Lista exacta permitida de fuentes:
 17. No afirmes relaciones causales no respaldadas explicitamente por los hechos.
 18. Si falta contexto o datos, indicalo como cautela, no como inferencia.
 19. Mantener tono ejecutivo: no listar mas de 3 titulares ni extenderse en noticias de baja relevancia.
+20. Nunca escribas los codigos internos de `symbol` o `affected_assets` (USDCLP, US10Y, COPPER, SP500): usa el `name` del snapshot o un nombre legible ("dolar", "USD/CLP", "cobre", "S&P 500", "Treasury 10 anos"). Aplica sobre todo a `subject`, `headline` y `preheader`, que el lector ve en la bandeja.
+21. Escribe frases completas en espanol, con verbo. No abras frases con "Posible que", "Preliminar que" ni "Probable que": usa "Es posible que" o "Podria". Si un hecho viene en ingles, redactalo en espanol; no copies el titular original.
 
 ## Graficos disponibles
 
@@ -53,6 +55,7 @@ Tipos validos para `chart_type`:
 - `chart_specs` solo usa `chart_id` en `AVAILABLE_CHART_IDS`.
 - Si snapshots tienen `price=null`, no generes `assets_table`.
 - `editorial_cautions` no contiene notas de metadata interna.
+- Ningun texto contiene codigos como USDCLP, US10Y o COPPER, ni frases en ingles.
 - Toda region high/medium tiene seccion propia.
 
 ## Respuesta esperada

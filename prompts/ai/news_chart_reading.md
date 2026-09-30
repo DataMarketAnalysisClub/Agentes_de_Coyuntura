@@ -13,6 +13,8 @@ titular con el movimiento del activo.
 - La relacion entre titular y precio es una hipotesis, no un hecho: usa
   formulas prudentes ("coincide con", "en un contexto de", "podria reflejar").
 - No recomiendes comprar, vender ni mantener activos.
+- En `reading` nombra el activo por su `name` ("cobre", "USD/CLP"), nunca por
+  su `symbol` (COPPER, USDCLP). El `symbol` solo va en el campo `symbol`.
 - Devuelve un elemento por cada `symbol` entregado, sin agregar otros.
   Si no hay una lectura prudente posible para un activo, omitelo.
 

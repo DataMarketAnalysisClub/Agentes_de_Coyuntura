@@ -130,9 +130,9 @@ un entorno local nuevo).
 3. ~~Correo en telefonos y clientes reales~~: resuelto con el diseno
    Editorial (columnas fluidas, solo claro, logo embebido); el usuario lo
    valido en Outlook el 2026-09-29.
-4. **Nix**: escribe codigos ("USDCLP", "US30Y") que ahora llegan al asunto,
-   y viñetas con prefijos rotos ("Posible que..."). Ajustar el prompt para
-   nombres legibles ("dolar", "USD/CLP") y frases completas.
+4. ~~**Nix**: codigos y prefijos rotos~~: resuelto el 2026-09-30 con una
+   limpieza deterministica (`services/ai/editorial_polish.py`) y reglas en
+   los prompts. Queda por revisar en correos reales el texto en ingles.
 
 ## Mailing con suscripcion (MySQL): implementado, falta activarlo
 

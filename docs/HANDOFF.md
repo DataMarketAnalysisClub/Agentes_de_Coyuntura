@@ -52,7 +52,7 @@ corre produccion.
   `EMAIL_ENABLED=false`, IA apagada. Nunca imprimir su contenido.
 - Los tests ignoran el `.env` (fixture en `tests/conftest.py`).
 - `mise exec python@3.11 -- python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`;
-  `.venv/bin/python -m pytest -q` (379 tests) y `.venv/bin/ruff check .`.
+  `.venv/bin/python -m pytest -q` (403 tests) y `.venv/bin/ruff check .`.
 
 ## Que se hizo el 2026-09-30: mailing con suscripcion (sin activar)
 
@@ -149,10 +149,9 @@ Microsoft Forms). Implementado y apagado por defecto: sin
    y `LOW_VALUE_PATTERNS` por substring e incluyen el nombre de la fuente.
    `impact_scoring` suma +1 a Latam/EE.UU./Global pero no a Chile.
    La nota de DF del dolar quedo como region "EE.UU." en un envio anterior.
-6. **Nix**: escribe codigos ("USDCLP", "US30Y") que ahora llegan al asunto;
-   viñetas con prefijos gramaticalmente rotos ("Posible que...",
-   "Preliminar que...") y hechos copiados en ingles; hoy se ocultan las
-   viñetas si hay parrafos, pero conviene corregir el prompt.
+6. **Nix**: codigos ("USDCLP") y prefijos rotos corregidos el 2026-09-30
+   (`services/ai/editorial_polish.py` + prompts). Falta mirar en correos
+   reales si quedan hechos copiados en ingles (solo lo pide el prompt).
 7. **Salud de fuentes**: calibrar umbrales tras ~2 semanas mirando `health`.
 8. **Activar el mailing con suscripcion**: implementado el 2026-09-30,
    falta DEPLOY.md "Mailing con suscripcion" (pasos 1-5: `.env`, Funnel,

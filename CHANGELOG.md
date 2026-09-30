@@ -2,6 +2,13 @@
 
 ## [Unreleased] - 2026-09-30
 
+### Corregido (texto de Nix)
+- Nix copiaba codigos internos ("USDCLP", "US30Y", "COPPER") al titular, que
+  llega al asunto. `services/ai/editorial_polish.py` los cambia por nombres
+  legibles ("USD/CLP", "Treasury 30 años", "cobre") en todo el texto de Nix y
+  en las lecturas de "En foco", y corrige prefijos sin verbo ("Posible que"
+  -> "Es posible que"). Los prompts piden lo mismo y frases en espanol.
+
 ### Agregado (mailing con suscripcion, apagado por defecto)
 - Lista de suscriptores en MySQL 8.4 (`storage/subscribers.py`): tablas
   `subscribers` (correo, estado `pending`/`active`/`unsubscribed`, token,
