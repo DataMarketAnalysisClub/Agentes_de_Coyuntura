@@ -90,3 +90,85 @@ def _ignore_local_env_file(monkeypatch):
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+# --- Suscriptores: el SQL de storage/subscribers.py sobre SQLite -------------
+
+_SQLITE_SUBSCRIBER_SCHEMA = """
+CREATE TABLE subscribers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'unsubscribed')),
+    token TEXT NOT NULL UNIQUE,
+    source TEXT NOT NULL DEFAULT 'web',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    confirmation_sent_at TEXT,
+    confirmed_at TEXT,
+    unsubscribed_at TEXT
+);
+CREATE TABLE subscriber_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subscriber_id INTEGER NOT NULL REFERENCES subscribers (id) ON DELETE CASCADE,
+    event TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT ''
+);
+"""
+
+
+class _SqliteCursor:
+    """Cursor estilo PyMySQL (%s, filas dict) sobre sqlite3."""
+
+    def __init__(self, cursor) -> None:
+        self._cursor = cursor
+
+    def execute(self, sql, params=()):
+        from datetime import datetime
+
+        values = tuple(value.isoformat(sep=" ") if isinstance(value, datetime) else value for value in params)
+        return self._cursor.execute(sql.replace("%s", "?"), values)
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return dict(row) if row is not None else None
+
+    def fetchall(self):
+        return [dict(row) for row in self._cursor.fetchall()]
+
+    def close(self) -> None:
+        self._cursor.close()
+
+
+class _SqliteConnection:
+    def __init__(self, path) -> None:
+        import sqlite3
+
+        self._connection = sqlite3.connect(path)
+        self._connection.row_factory = sqlite3.Row
+        self._connection.execute("PRAGMA foreign_keys = ON")
+
+    def cursor(self):
+        return _SqliteCursor(self._connection.cursor())
+
+    def commit(self) -> None:
+        self._connection.commit()
+
+    def rollback(self) -> None:
+        self._connection.rollback()
+
+    def close(self) -> None:
+        self._connection.close()
+
+
+@pytest.fixture
+def subscriber_repository(tmp_path):
+    """SubscriberRepository real sobre un archivo SQLite temporal."""
+    import sqlite3
+
+    from storage.subscribers import SubscriberRepository
+
+    path = tmp_path / "subscribers.db"
+    with sqlite3.connect(path) as connection:
+        connection.executescript(_SQLITE_SUBSCRIBER_SCHEMA)
+    return SubscriberRepository(lambda: _SqliteConnection(path))

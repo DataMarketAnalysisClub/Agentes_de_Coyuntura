@@ -37,6 +37,28 @@ class Settings(BaseSettings):
     # Vacio: los cambios de estado solo quedan en el log.
     ops_email_to: str = ""
 
+    # Mailing con suscripcion (MySQL + servicio web de altas y bajas). Apagado,
+    # el brief va a EMAIL_TO/EMAIL_CC como siempre. Encendido, va a cada
+    # suscriptor `active`, un correo por persona con su link de baja.
+    mailing_enabled: bool = False
+    # URL publica HTTPS del servicio de suscripcion (Tailscale Funnel), sin "/"
+    # final. Arma los links de confirmacion y baja.
+    mailing_public_url: str = ""
+    mailing_web_host: str = "0.0.0.0"
+    mailing_web_port: int = 8080
+    # Link de confirmacion valido por estos dias; despues hay que volver a
+    # inscribirse.
+    mailing_confirm_ttl_days: int = 7
+    # Frenos a abusos del formulario: minutos entre correos de confirmacion a
+    # una misma direccion y maximo de correos de confirmacion por hora.
+    mailing_confirm_resend_minutes: int = 10
+    mailing_confirm_max_per_hour: int = 60
+    mysql_host: str = "mysql"
+    mysql_port: int = 3306
+    mysql_database: str = "dmac_mailing"
+    mysql_user: str = "dmac_mailing"
+    mysql_password: str = ""
+
     bcentral_user: str = ""
     bcentral_password: str = ""
     bcentral_credentials_file: str = ""

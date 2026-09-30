@@ -1,5 +1,7 @@
 apscheduler==3.10.4
 beautifulsoup4==4.12.3
+# Autenticacion caching_sha2_password de MySQL 8 sin TLS (PyMySQL[rsa]).
+cryptography==50.0.2
 feedparser==6.0.11
 httpx==0.27.2
 kaleido==0.2.1
@@ -9,6 +11,8 @@ plotly==5.24.1
 pybreaker==1.0.2
 pydantic==2.9.2
 pydantic-settings==2.6.1
+# Suscriptores del mailing en MySQL (storage/subscribers.py).
+PyMySQL==1.2.3
 python-dotenv==1.0.1
 # Version probada en vivo el 2026-09-28 (17/17 activos, ver NEXT_STEPS.md).
 # yfinance >= 1.0 instala curl_cffi (impersonation de navegador) por su cuenta.
