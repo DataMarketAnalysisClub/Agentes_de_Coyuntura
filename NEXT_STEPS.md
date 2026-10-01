@@ -156,7 +156,10 @@ Pendientes:
 5. **Politica de privacidad**: el formulario muestra finalidad y contacto
    (`OPS_EMAIL_TO`); falta revisarla con el club (ley 19.628 / 21.719).
 6. **Opcional**: aviso a mantenedores con altas/bajas del dia; limpiar filas
-   `pending` vencidas (> 30 dias).
+   `pending` vencidas (> 30 dias); elegir edicion (manana, cierre o ambas)
+   si las bajas lo justifican (hoy: ambas siempre, decision del club).
+7. **Difusion**: link de `MAILING_PUBLIC_URL` en Instagram/Linktree del club,
+   QR en afiches y charlas, firma de correo de la directiva.
 
 ## CI/CD
 

@@ -134,7 +134,9 @@ def test_active_subscriber_gets_no_new_email(service, sender) -> None:
     service.confirm(_token_from(sender.sent[0]))
 
     assert service.subscribe("ana@udd.cl") is SubscribeOutcome.ALREADY_ACTIVE
-    assert len(sender.sent) == 1
+    assert [m["subject"] for m in sender.sent] == [
+        "Confirma tu suscripción a DMAC Brief", "Bienvenido a DMAC Brief",
+    ]
 
 
 def test_unsubscribe_is_idempotent_and_blocks_old_confirmation(service, subscriber_repository, sender) -> None:
@@ -163,7 +165,7 @@ def test_resubscribe_after_unsubscribe_rotates_token(service, subscriber_reposit
     service.unsubscribe(old_token)
 
     assert service.subscribe("ana@udd.cl") is SubscribeOutcome.CONFIRMATION_SENT
-    new_token = _token_from(sender.sent[1])
+    new_token = _token_from(sender.sent[-1])
     assert new_token != old_token
     assert service.unsubscribe(old_token) is UnsubscribeOutcome.INVALID
     assert subscriber_repository.active() == []
@@ -220,3 +222,35 @@ def test_repository_counts_and_audit_events(service, subscriber_repository, send
     since = clock.now - timedelta(minutes=1)
     assert subscriber_repository.count_events_since(SubscriberEvent.SUBSCRIBE_REQUESTED, since) == 2
     assert subscriber_repository.count_events_since(SubscriberEvent.CONFIRMED, since) == 1
+
+
+def test_confirm_sends_welcome_with_personal_unsubscribe_link(service, subscriber_repository, sender) -> None:
+    service.subscribe("ana@udd.cl")
+    token = _token_from(sender.sent[0])
+    service.confirm(token)
+
+    welcome = sender.sent[1]
+    assert welcome["subject"] == "Bienvenido a DMAC Brief"
+    assert welcome["recipients"] == ["ana@udd.cl"]
+    assert f"{PUBLIC_URL}/baja?t={token}" in welcome["text"]
+    assert f'href="{PUBLIC_URL}/baja?t={token}"' in welcome["html"]
+    assert "08:30" in welcome["text"] and "18:30" in welcome["text"]
+
+    service.confirm(token)  # ya activo: sin segunda bienvenida
+    assert len(sender.sent) == 2
+
+
+def test_welcome_failure_does_not_undo_confirmation(subscriber_repository, clock) -> None:
+    class FailingWelcome(FakeSender):
+        def send(self, subject, text_body, html_body, enabled, recipients=None):
+            if subject.startswith("Bienvenido"):
+                raise ConnectionError("smtp down")
+            return super().send(subject, text_body, html_body, enabled, recipients)
+
+    sender = FailingWelcome()
+    settings = Settings(mailing_public_url=PUBLIC_URL, email_enabled=True)
+    service = SubscriptionService(subscriber_repository, settings, sender=sender, clock=clock)
+    service.subscribe("ana@udd.cl")
+
+    assert service.confirm(_token_from(sender.sent[0])) is ConfirmOutcome.CONFIRMED
+    assert subscriber_repository.get_by_email("ana@udd.cl").status is SubscriberStatus.ACTIVE

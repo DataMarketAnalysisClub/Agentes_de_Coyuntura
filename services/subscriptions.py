@@ -166,6 +166,7 @@ class SubscriptionService:
         self.repository.activate(subscriber.id, now)
         self.repository.add_event(subscriber.id, SubscriberEvent.CONFIRMED, now)
         logger.info("Subscriber confirmed", extra={"subscriber_id": subscriber.id})
+        self._send_welcome(subscriber)
         return ConfirmOutcome.CONFIRMED
 
     def unsubscribe(self, token: str | None, detail: str = "link") -> UnsubscribeOutcome:
@@ -227,6 +228,18 @@ class SubscriptionService:
         sent = self.repository.count_events_since(SubscriberEvent.CONFIRMATION_SENT, now - timedelta(hours=1))
         return sent >= self.settings.mailing_confirm_max_per_hour
 
+    def _send_welcome(self, subscriber: Subscriber) -> None:
+        """La confirmacion ya quedo hecha: si el correo falla, solo se registra."""
+        subject, text_body, html_body = welcome_email(self.unsubscribe_url(subscriber.token))
+        try:
+            sent = self.sender.send(
+                subject, text_body, html_body, self.settings.email_enabled, recipients=[subscriber.email]
+            )
+        except Exception:
+            sent = False
+        if not sent:
+            logger.warning("Welcome email not sent", extra={"subscriber_id": subscriber.id})
+
     def _send_confirmation(self, subscriber: Subscriber, now: datetime) -> SubscribeOutcome:
         subject, text_body, html_body = confirmation_email(self.confirm_url(subscriber.token))
         sent = self.sender.send(
@@ -240,6 +253,27 @@ class SubscriptionService:
         return SubscribeOutcome.CONFIRMATION_SENT
 
 
+def _simple_email_html(content_html: str) -> str:
+    """Correo transaccional sobrio (confirmacion, bienvenida)."""
+    return (
+        "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>"
+        "<body style=\"margin:0;padding:24px 12px;background:#f4f4f1;"
+        "font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;\">"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">"
+        "<tr><td align=\"center\">"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
+        " style=\"max-width:560px;background:#ffffff;border:1px solid #d9d9d4;\">"
+        "<tr><td style=\"padding:28px 28px 8px 28px;font-size:28px;font-weight:700;\">DMAC Brief</td></tr>"
+        "<tr><td style=\"padding:8px 28px;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;\">"
+        f"{content_html}"
+        "</td></tr>"
+        "<tr><td style=\"padding:8px 28px 24px 28px;font-family:Arial,sans-serif;font-size:12px;color:#5c5c58;\">"
+        "Data Market Analysis Club UDD</td></tr>"
+        "</table></td></tr></table></body></html>"
+    )
+
+
 def confirmation_email(confirm_url: str) -> tuple[str, str, str]:
     """Asunto, texto y HTML del correo de confirmacion (sin link de baja)."""
     subject = "Confirma tu suscripción a DMAC Brief"
@@ -251,17 +285,7 @@ def confirmation_email(confirm_url: str) -> tuple[str, str, str]:
         "Si no fuiste tú, ignora este mensaje: sin confirmación no te enviaremos nada.\n"
     )
     url = escape(confirm_url, quote=True)
-    html_body = (
-        "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>"
-        "<body style=\"margin:0;padding:24px 12px;background:#f4f4f1;"
-        "font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;\">"
-        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">"
-        "<tr><td align=\"center\">"
-        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\""
-        " style=\"max-width:560px;background:#ffffff;border:1px solid #d9d9d4;\">"
-        "<tr><td style=\"padding:28px 28px 8px 28px;font-size:28px;font-weight:700;\">DMAC Brief</td></tr>"
-        "<tr><td style=\"padding:8px 28px;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;\">"
+    html_body = _simple_email_html(
         "<p>Recibimos una solicitud para inscribir este correo en <strong>DMAC Brief</strong>,"
         " el resumen de coyuntura financiera del Data Market Analysis Club UDD.</p>"
         f"<p style=\"margin:24px 0;\"><a href=\"{url}\" style=\"background:#1a1a1a;color:#ffffff;"
@@ -270,9 +294,33 @@ def confirmation_email(confirm_url: str) -> tuple[str, str, str]:
         f"<p style=\"font-size:13px;color:#5c5c58;\">Si el botón no funciona, copia este enlace:<br>{url}</p>"
         "<p style=\"font-size:13px;color:#5c5c58;\">Si no fuiste tú, ignora este mensaje:"
         " sin confirmación no te enviaremos nada.</p>"
-        "</td></tr>"
-        "<tr><td style=\"padding:8px 28px 24px 28px;font-family:Arial,sans-serif;font-size:12px;color:#5c5c58;\">"
-        "Data Market Analysis Club UDD</td></tr>"
-        "</table></td></tr></table></body></html>"
+    )
+    return subject, text_body, html_body
+
+
+def welcome_email(unsubscribe_url: str) -> tuple[str, str, str]:
+    """Bienvenida tras confirmar: que esperar y como darse de baja."""
+    subject = "Bienvenido a DMAC Brief"
+    text_body = (
+        "¡Listo! Tu suscripción a DMAC Brief está confirmada.\n\n"
+        "Cada día hábil recibirás dos ediciones:\n"
+        "- 08:30, Brief de la mañana: lo que mueve a los mercados antes de la apertura.\n"
+        "- 18:30, Cierre: cómo terminó la jornada en Chile y el mundo.\n\n"
+        "Para que no lleguen a spam, agrega este remitente a tus contactos.\n\n"
+        "DMAC Brief es material informativo y no constituye recomendación de inversión.\n\n"
+        f"Puedes cancelar la suscripción cuando quieras: {unsubscribe_url}\n"
+    )
+    url = escape(unsubscribe_url, quote=True)
+    html_body = _simple_email_html(
+        "<p><strong>¡Listo! Tu suscripción está confirmada.</strong></p>"
+        "<p>Cada día hábil recibirás dos ediciones:</p>"
+        "<ul style=\"padding-left:18px;\">"
+        "<li><strong>08:30, Brief de la mañana</strong>: lo que mueve a los mercados antes de la apertura.</li>"
+        "<li><strong>18:30, Cierre</strong>: cómo terminó la jornada en Chile y el mundo.</li></ul>"
+        "<p>Para que no lleguen a spam, agrega este remitente a tus contactos.</p>"
+        "<p style=\"font-size:13px;color:#5c5c58;\">DMAC Brief es material informativo y no constituye"
+        " recomendación de inversión.</p>"
+        f"<p style=\"font-size:13px;color:#5c5c58;\"><a href=\"{url}\" style=\"color:#5c5c58;\">"
+        "Cancelar suscripción</a></p>"
     )
     return subject, text_body, html_body

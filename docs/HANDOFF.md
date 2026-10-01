@@ -52,7 +52,7 @@ corre produccion.
   `EMAIL_ENABLED=false`, IA apagada. Nunca imprimir su contenido.
 - Los tests ignoran el `.env` (fixture en `tests/conftest.py`).
 - `mise exec python@3.11 -- python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`;
-  `.venv/bin/python -m pytest -q` (403 tests) y `.venv/bin/ruff check .`.
+  `.venv/bin/python -m pytest -q` (408 tests) y `.venv/bin/ruff check .`.
 
 ## Que se hizo el 2026-09-30: mailing con suscripcion (sin activar)
 
@@ -135,6 +135,10 @@ Microsoft Forms). Implementado y apagado por defecto: sin
   otra fuente salvo que Yahoo deje de publicarlo.
 - Mailing: servicio web propio publicado con Tailscale Funnel, con doble
   confirmacion y baja de un clic (2026-09-30). No usar formularios externos.
+- Suscripcion (2026-09-30): abierta a cualquier correo (no solo `@udd.cl`),
+  solo se pide el correo, ambas ediciones siempre, correo de bienvenida al
+  confirmar e invitacion "¿Te reenviaron este correo?" en el pie del brief.
+  Prueba visual de la baja enviada a brcarom@udd.cl y aprobada.
 
 ## Trabajo pendiente (en orden sugerido)
 

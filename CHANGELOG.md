@@ -2,6 +2,13 @@
 
 ## [Unreleased] - 2026-09-30
 
+### Agregado (difusion del mailing)
+- Pie del brief: "¿Te reenviaron este correo? Suscribete a DMAC Brief", con
+  link a `MAILING_PUBLIC_URL`; no aparece sin URL publica ni en avisos o
+  pruebas con `recipients`.
+- Correo de bienvenida al confirmar la suscripcion (horarios de las ediciones,
+  aviso de spam y link de baja). Si falla, la confirmacion se mantiene.
+
 ### Corregido (texto de Nix)
 - Nix copiaba codigos internos ("USDCLP", "US30Y", "COPPER") al titular, que
   llega al asunto. `services/ai/editorial_polish.py` los cambia por nombres

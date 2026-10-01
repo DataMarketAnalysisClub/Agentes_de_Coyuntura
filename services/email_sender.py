@@ -6,7 +6,12 @@ from email.utils import formataddr
 from pathlib import Path
 
 from app.config import Settings, get_settings
-from services.email_formatter import text_with_unsubscribe_link, with_unsubscribe_link
+from services.email_formatter import (
+    text_with_subscribe_link,
+    text_with_unsubscribe_link,
+    with_subscribe_link,
+    with_unsubscribe_link,
+)
 from storage.models import SentEmail
 from storage.repositories import SentEmailRepository
 
@@ -54,6 +59,11 @@ class EmailSender:
         to EMAIL_TO/EMAIL_CC.
         """
         del inline_images  # deprecated: HTML is self-contained now
+        # Invitacion "¿Te reenviaron este correo?" solo en el brief (sin
+        # `recipients`) y con URL publica; nunca en avisos ni pruebas.
+        subscribe_url = self.settings.mailing_public_url.rstrip("/") if recipients is None else ""
+        html_body = with_subscribe_link(html_body, subscribe_url or None)
+        text_body = text_with_subscribe_link(text_body, subscribe_url or None)
         if recipients is None and self.settings.mailing_enabled:
             subscribers = self._load_subscribers()
             if subscribers is not None:

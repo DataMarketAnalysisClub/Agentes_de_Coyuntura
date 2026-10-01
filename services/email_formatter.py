@@ -619,6 +619,12 @@ def _footer_html() -> str:
         "Reporte generado automáticamente por <strong>DMAC Market Brief Agent</strong>."
         " Los hechos se basan en titulares públicos y precios de mercado al momento del envío."
         " Las interpretaciones son preliminares y no constituyen recomendación de inversión.</p>"
+        f"{SUBSCRIBE_BLOCK_START}"
+        f"<p style=\"margin: 12px 0 0 0; font-size: 14px; color: {DMAC_TEXT}; line-height: 1.5;\">"
+        "¿Te reenviaron este correo? "
+        f"<a href=\"{SUBSCRIBE_URL_PLACEHOLDER}\" style=\"color: {DMAC_BRAND_PRIMARY}; font-weight: 700;"
+        " text-decoration: underline;\">Suscríbete a DMAC Brief</a> y recíbelo cada día hábil.</p>"
+        f"{SUBSCRIBE_BLOCK_END}"
         f"<p style=\"margin: 10px 0 0 0; font-size: 13px; color: {DMAC_MUTED}; line-height: 1.5;\">"
         f"<strong style=\"color: {DMAC_TEXT};\">Nix Assistant, DMAC UDD</strong> &middot; Equipo de Datos y Coyuntura"
         f" &middot; &copy; {year} Data Market Analysis Club UDD</p>"
@@ -641,6 +647,28 @@ UNSUBSCRIBE_BLOCK_END = "<!--/dmac-unsubscribe-->"
 _UNSUBSCRIBE_BLOCK_RE = re.compile(
     re.escape(UNSUBSCRIBE_BLOCK_START) + ".*?" + re.escape(UNSUBSCRIBE_BLOCK_END), re.DOTALL
 )
+
+
+# Invitacion a suscribirse para quien recibe el brief reenviado. Mismo
+# mecanismo: `EmailSender` pone MAILING_PUBLIC_URL en los envios del brief y
+# quita el bloque en avisos a mantenedores, pruebas o si no hay URL publica.
+SUBSCRIBE_URL_PLACEHOLDER = "%%DMAC_SUBSCRIBE_URL%%"
+SUBSCRIBE_BLOCK_START = "<!--dmac-subscribe-->"
+SUBSCRIBE_BLOCK_END = "<!--/dmac-subscribe-->"
+_SUBSCRIBE_BLOCK_RE = re.compile(re.escape(SUBSCRIBE_BLOCK_START) + ".*?" + re.escape(SUBSCRIBE_BLOCK_END), re.DOTALL)
+
+
+def with_subscribe_link(html_body: str, url: str | None) -> str:
+    """Pone el link al formulario de suscripcion, o quita el bloque si no hay."""
+    if not url:
+        return _SUBSCRIBE_BLOCK_RE.sub("", html_body)
+    return html_body.replace(SUBSCRIBE_URL_PLACEHOLDER, escape(url, quote=True))
+
+
+def text_with_subscribe_link(text_body: str, url: str | None) -> str:
+    if not url:
+        return text_body
+    return f"{text_body.rstrip()}\n\n¿Te reenviaron este correo? Suscríbete a DMAC Brief: {url}\n"
 
 
 def with_unsubscribe_link(html_body: str, url: str | None) -> str:

@@ -509,7 +509,8 @@ Flujo:
    envia un correo con el link `/confirmar?t=...`. La respuesta es la misma
    exista o no el correo (no revela quien esta inscrito).
 2. **Confirmacion**: el link abre una pagina con un boton; el POST pasa la fila
-   a `active`. El link vence a los `MAILING_CONFIRM_TTL_DAYS` dias (7).
+   a `active` y envia un correo de bienvenida (horarios de las dos ediciones y
+   link de baja). El link vence a los `MAILING_CONFIRM_TTL_DAYS` dias (7).
 3. **Envio**: los jobs no cambian. `EmailSender` lee los `active` al momento de
    enviar, asi que una alta o baja rige desde el siguiente envio sin reiniciar
    nada. Cada correo lleva el link de baja personal en el pie y las cabeceras
@@ -517,6 +518,11 @@ Flujo:
    Outlook muestran como boton "Cancelar suscripcion".
 4. **Baja**: el link del pie abre una pagina con boton; el boton del cliente de
    correo hace el POST directo. La baja es inmediata e idempotente.
+
+Difusion: el pie de cada brief invita "¿Te reenviaron este correo?
+Suscribete a DMAC Brief" con link a `MAILING_PUBLIC_URL` (sin URL publica el
+bloque no aparece). Inscripcion abierta a cualquier correo, solo se pide el
+correo y todos reciben ambas ediciones (decision del club, 2026-09-30).
 
 Confirmar y dar de baja exigen POST porque los antivirus de correo (Outlook
 Safe Links) abren los links con GET. Los avisos a mantenedores

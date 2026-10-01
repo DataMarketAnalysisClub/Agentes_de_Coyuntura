@@ -245,3 +245,46 @@ def test_mailing_with_no_active_subscribers_sends_nothing(monkeypatch) -> None:
     )
     assert FakeSMTP.sent == []
     assert repository.saved[0].status == "skipped"
+
+
+def test_brief_invites_forwarded_readers_to_subscribe(monkeypatch) -> None:
+    FakeSMTP.sent = []
+    monkeypatch.setattr(email_sender.smtplib, "SMTP", FakeSMTP)
+    settings = Settings(**{**SMTP_SETTINGS, "mailing_public_url": "https://dmac.example.ts.net/"})
+
+    assert EmailSender(settings, FakeRepository()).send("Brief", "texto", _html(), True)
+
+    text_part, html_part = FakeSMTP.sent[0].get_payload()
+    html = html_part.get_content()
+    assert "¿Te reenviaron este correo?" in html
+    assert 'href="https://dmac.example.ts.net"' in html
+    assert "%%DMAC_SUBSCRIBE_URL%%" not in html
+    assert "Suscríbete a DMAC Brief: https://dmac.example.ts.net" in text_part.get_content()
+
+
+def test_subscriber_copies_also_carry_the_subscribe_invite(monkeypatch) -> None:
+    FakeSMTP.sent = []
+    monkeypatch.setattr(email_sender.smtplib, "SMTP", FakeSMTP)
+    subscribers = FakeSubscribers([_subscriber(1, "ana@udd.cl")])
+
+    assert EmailSender(Settings(**MAILING_SETTINGS), FakeRepository(), subscribers=subscribers).send(
+        "Brief", "texto", _html(), True
+    )
+    html = FakeSMTP.sent[0].get_payload()[1].get_content()
+    assert 'href="https://dmac.example.ts.net"' in html
+    assert "Cancelar suscripción" in html
+
+
+def test_no_subscribe_invite_without_public_url_or_in_ops_emails(monkeypatch) -> None:
+    FakeSMTP.sent = []
+    monkeypatch.setattr(email_sender.smtplib, "SMTP", FakeSMTP)
+    with_url = Settings(**{**SMTP_SETTINGS, "mailing_public_url": "https://dmac.example.ts.net"})
+
+    assert EmailSender(Settings(**SMTP_SETTINGS), FakeRepository()).send("Brief", "texto", _html(), True)
+    assert EmailSender(with_url, FakeRepository()).send("Ops", "t", _html(), True, recipients=["ops@x.cl"])
+
+    for message in FakeSMTP.sent:
+        text_part, html_part = message.get_payload()
+        assert "reenviaron" not in html_part.get_content()
+        assert "dmac-subscribe" not in html_part.get_content()
+        assert "reenviaron" not in text_part.get_content()
