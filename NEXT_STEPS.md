@@ -134,6 +134,15 @@ un entorno local nuevo).
    limpieza deterministica (`services/ai/editorial_polish.py`) y reglas en
    los prompts. Queda por revisar en correos reales el texto en ingles.
 
+## Siguiente mision: auditoria de seguridad
+
+Superficie publica nueva (servicio de suscripcion via Funnel) y datos
+personales en MySQL. Alcance detallado en `docs/HANDOFF.md` ("Siguiente
+mision"): servicio publico, datos y respaldos, secretos (rotar la clave del
+BCCh), servidor `nixbox`, politica de Tailscale, dependencias y correo.
+Despues: frontend de las paginas de suscripcion con logo (CSP hoy bloquea
+imagenes).
+
 ## Mailing con suscripcion (MySQL): implementado, falta activarlo
 
 Implementado el 2026-09-30 y apagado por defecto (ver README "Mailing con
@@ -143,16 +152,18 @@ doble confirmacion y baja de un clic.
 
 Pendientes:
 
-1. **Activar en produccion** (DEPLOY.md, pasos 1-5): `.env`, Funnel,
-   prueba de alta/confirmacion/baja desde un telefono sin Tailscale y
-   `subscribers add dmac@udd.cl` antes de `MAILING_ENABLED=true`.
+1. **Encender el envio** (DEPLOY.md, paso 5), despues de la auditoria.
+   Pasos 1-3 hechos el 2026-09-30 (`.env`, contenedores, Funnel en 8090) y
+   links probados desde PC y celulares. Falta `subscribers add dmac@udd.cl`
+   y `MAILING_ENABLED=true`.
 2. ~~DDL de MySQL no probado en vivo~~: verificado el 2026-09-30 en nixbox
    con un MySQL 8.4 desechable y la imagen desplegada (esquema idempotente,
    alta/confirmacion/baja/borrado, token sensible a mayusculas, duplicados).
 3. **SMTP institucional de la UDD** antes de ~200 suscriptores (Gmail
    personal ~500 destinatarios/dia; cada suscriptor recibe 2 correos).
 4. **Difusion**: la URL de Funnel (`nixbox.<tailnet>.ts.net`) expone el
-   nombre del tailnet; un dominio propio del club seria mas presentable.
+   nombre del tailnet; un dominio propio del club seria mas presentable
+   (`dmac.cl` libre el 2026-09-30; Cloudflare DNS + Tunnel como opcion).
 5. **Politica de privacidad**: el formulario muestra finalidad y contacto
    (`OPS_EMAIL_TO`); falta revisarla con el club (ley 19.628 / 21.719).
 6. **Opcional**: aviso a mantenedores con altas/bajas del dia; limpiar filas

@@ -1,4 +1,4 @@
-# Handoff: sesion 2026-09-30
+# Handoff: sesion 2026-09-30 (cierre)
 
 Estado completo para retomar el trabajo en otra sesion. Detalle de cambios
 en `CHANGELOG.md` ("Unreleased") y backlog tecnico en `NEXT_STEPS.md`.
@@ -7,13 +7,59 @@ commitear y entrega los commits propuestos; el usuario los hace junto al push.
 Como `scripts/deploy.sh` despliega solo codigo commiteado, antes de desplegar
 cambios nuevos el usuario debe commitearlos.
 
+## Siguiente mision: auditoria completa de seguridad
+
+Desde el 2026-09-30 el proyecto tiene una superficie publica en internet (el
+servicio de suscripcion via Tailscale Funnel) y una base con datos
+personales. Antes de encender el envio a suscriptores, auditar de punta a
+punta. Alcance minimo:
+
+1. **Servicio publico** (`app/subscription_server.py`): `http.server` de la
+   libreria estandar expuesto a internet. Revisar DoS (`ThreadingHTTPServer`
+   sin tope de hilos; hoy solo `timeout = 15` y cuerpos <= 4 KB), abuso del
+   formulario (topes de confirmacion por correo y por hora; sin limite por
+   IP), cabeceras (CSP, HSTS lo pone Funnel?), manejo de errores sin fugas,
+   tokens en URLs (Referrer-Policy, logs propios y de `tailscaled`/Funnel).
+   Evaluar un proxy delante (Caddy/nginx con rate limit) o endurecer.
+2. **Datos personales**: MySQL (usuario de app con permisos minimos?, root
+   solo para dumps), respaldos en `~/backups` sin cifrar (tar con `.env`,
+   SQLite y dumps de suscriptores), retencion de `pending` vencidos,
+   `subscribers erase`, politica de privacidad (ley 19.628 / 21.719).
+3. **Secretos**: `.env` de produccion (permisos 600), app password de Gmail,
+   `OLLAMA_API_KEY`, credenciales BCCh. **Rotar la contrasena del BCCh**: el
+   2026-09-30 un `docker compose config` sin `--no-interpolate` imprimio el
+   `.env` local en la salida de la sesion de Claude (no salio a terceros).
+   Buscar secretos en el historial de git.
+4. **Servidor `nixbox`**: puertos escuchando en todas las interfaces (22, 53,
+   80, 3000, 8080 = nginx por defecto de otro uso, 11434 = Ollama, 25566,
+   25575); `bruno` con `sudo` sin contrasena y en el grupo `docker`;
+   actualizaciones del SO; el contenedor de la app corre como root.
+5. **Tailscale**: la politica permite todo entre dispositivos (`grants`
+   `*`->`*`); Funnel habilitado para `autogroup:member`. Acotar Funnel a
+   `nixbox` (tag) y revisar quien esta en el tailnet.
+6. **Dependencias**: `pip-audit` sobre `requirements.txt`, imagen base
+   `python:3.11-slim` y `mysql:8.4`.
+7. **Correo**: SPF/DKIM/DMARC del remitente (Gmail personal hoy; SMTP UDD a
+   futuro), cabeceras `List-Unsubscribe`, que ningun envio exponga la lista.
+
+## Despues: frontend de las paginas de suscripcion
+
+Las paginas que sirve el servicio (`/`, `/confirmar`, `/baja` y sus
+mensajes, en `app/subscription_server.py`) son sobrias y sin logo. Mejorarlas
+con la identidad del brief: logo DMAC, tipografia y colores del diseno
+"Editorial". Ojo: la CSP actual es `default-src 'none'` (bloquea imagenes);
+servir el logo desde el propio servicio (ruta `/logo.png` +
+`img-src 'self'`) o como `data:` (`img-src data:`). Revisar tambien los
+correos de confirmacion y bienvenida (`services/subscriptions.py`), que hoy
+no llevan logo.
+
 ## Estado de ramas y produccion (lo primero a revisar)
 
 | Donde | Commit | Contenido |
 |---|---|---|
-| `origin/main` | `239704e` | Brent (contrato vigente), diseno Editorial, series BCCh, decision IPSA |
-| `main` local | ver `git log` | + modo oscuro, textos mas grandes en telefono y este handoff (sin push) |
-| **Produccion (`nixbox`)** | ver `DEPLOYED_COMMIT` en el servidor | Se despliega `main` local con `scripts/deploy.sh` |
+| `origin/main` | `33a0a67` | Mailing completo, bienvenida, "Suscribete" en el pie, limpieza de Nix |
+| `main` local | ver `git log` | + este handoff y docs de la activacion (commit propuesto) |
+| **Produccion (`nixbox`)** | `33a0a67` | Desplegado el 2026-09-30 21:28 (respaldo `~/backups/dmac-20260930-212820.tgz`) |
 
 Comprobar con `git log --oneline origin/main..main` que falta pushear y con
 `ssh bruno@nixbox cat /opt/dmac-market-brief-agent/DEPLOYED_COMMIT` que
@@ -24,92 +70,78 @@ corre produccion.
 - `bruno@nixbox` por Tailscale; app en `/opt/dmac-market-brief-agent`
   (Docker Compose). **No es repo git**: `git pull` ahi no hace nada.
 - Desplegar SIEMPRE con `scripts/deploy.sh` (simulacion) y
-  `scripts/deploy.sh --apply` (respaldo en `~/backups`, rsync seguro,
-  rebuild, verificacion). `DEPLOY_REF=<rama|commit>` para otra referencia.
-  El usuario autorizo a Claude a desplegar (2026-09-29).
+  `scripts/deploy.sh --apply` (respaldo en `~/backups`, `mysqldump` si
+  `mysql` corre, rsync seguro, rebuild, verificacion). El usuario autorizo a
+  Claude a desplegar (2026-09-29).
 - Acceso de Claude: llave `~/.ssh/id_ed25519` (con passphrase). En cada
-  sesion el usuario la desbloquea en un agente temporal:
+  sesion el usuario la desbloquea en un agente temporal (8 h):
   `ssh-agent -a /run/user/1000/ssh-claude.sock -t 8h` y
   `SSH_AUTH_SOCK=/run/user/1000/ssh-claude.sock ssh-add ~/.ssh/id_ed25519`.
+- Contenedores: `dmac-market-brief-agent` (scheduler), `dmac-mysql`
+  (volumen `mysql-data`, sin puertos) y `dmac-subscriptions`
+  (`127.0.0.1:8090`). Los dos ultimos por `COMPOSE_PROFILES=mailing`.
 - `.env` de produccion: `EMAIL_ENABLED=true`, `DRY_RUN=false`, IA activa,
-  `EMAIL_TO=dmac@udd.cl` y `OPS_EMAIL_TO=dmac@udd.cl` (desde el
-  2026-09-29; antes brcarom@udd.cl, respaldo del `.env` en
-  `~/backups/env-20260929-182440.bak`), monitor de alto impacto apagado. Las
-  series nuevas del BCCh usan los defaults de `app/config.py` (no hace falta
-  agregarlas al `.env`).
+  `EMAIL_TO=dmac@udd.cl`, `OPS_EMAIL_TO=dmac@udd.cl`, monitor de alto
+  impacto apagado, y desde el 2026-09-30: `COMPOSE_PROFILES=mailing`,
+  `MAILING_ENABLED=false`, `MAILING_PUBLIC_URL=https://nixbox.tailce797f.ts.net`,
+  `MAILING_HOST_PORT=8090` (el 8080 es de un nginx del sistema) y
+  `MYSQL_PASSWORD`/`MYSQL_ROOT_PASSWORD` generadas en el servidor (nunca se
+  imprimieron). Respaldos del `.env`: `~/backups/env-20261001-002913.bak`
+  (antes del mailing) y `~/backups/env-20260929-182440.bak`.
   **Nunca correr `app.main morning/close` como prueba: envia a la lista.**
-- Correo de prueba: replicar el job con `EmailSender.send(...,
-  recipients=["dmac@udd.cl"])`, sin `BriefRepository().save` ni
-  `save_mentions`, ejecutando el script dentro del contenedor:
+- **Funnel**: `https://nixbox.tailce797f.ts.net` -> `127.0.0.1:8090`
+  (`sudo tailscale funnel --bg 8090`; apagar con
+  `sudo tailscale funnel --https=443 off`). El DNS publico tardo mas de 20 min en
+  aparecer la primera vez (bug conocido de Tailscale con 1.102.2,
+  issues #21502/#21429): si un celular no encuentra el servidor, consultar
+  `dig @ns1.dnsimple.com nixbox.tailce797f.ts.net A`; desde un equipo con
+  Tailscale el nombre resuelve siempre (MagicDNS) y no prueba nada.
+  Verificado desde internet el 2026-09-30: `/` 200, `/salud` 200.
+- **Suscriptores** (2026-09-30): 1 `active` (brcarom@udd.cl, alta de
+  prueba) y 2 `pending` (pruebas del usuario). `dmac@udd.cl` aun no esta
+  sembrado. Ver con
+  `docker compose exec -T dmac-subscriptions python -m app.main subscribers list`.
+- **Correo de prueba con links reales**: script que da de alta al
+  destinatario con `subscribers add`, replica `jobs.market_close` sin
+  guardar brief/menciones/salud, suprime avisos a mantenedores y envia por
+  `EmailSender.send` con el mailing encendido solo en ese proceso y una
+  lista de un unico suscriptor. Se ejecuta con
   `ssh bruno@nixbox "cd /opt/dmac-market-brief-agent && docker compose exec -T dmac-market-brief-agent python -" < script.py`.
-- Respaldos: `~/backups/dmac-20260929-114708.tgz` (antes del correo
-  multiplataforma) y `~/backups/dmac-20260929-144512.tgz` (antes de `239704e`).
+  El clasificador de permisos de Claude bloquea ese envio ("Remote Shell
+  Writes"): Claude prepara el script y el usuario lo corre con `!`.
 
 ## Entorno local
 
 - `.env` local (copiado de `.env.example`, permisos 600, ignorado por git)
   con credenciales del BCCh **solo en esta maquina**; `DRY_RUN=true`,
-  `EMAIL_ENABLED=false`, IA apagada. Nunca imprimir su contenido.
-- Los tests ignoran el `.env` (fixture en `tests/conftest.py`).
+  `EMAIL_ENABLED=false`, IA apagada. Nunca imprimir su contenido: usar
+  `docker compose config --no-interpolate`.
+- Sin Docker utilizable ni MySQL en la maquina de desarrollo: los tests del
+  repositorio de suscriptores corren el SQL sobre SQLite (`tests/conftest.py`).
 - `mise exec python@3.11 -- python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`;
   `.venv/bin/python -m pytest -q` (408 tests) y `.venv/bin/ruff check .`.
 
-## Que se hizo el 2026-09-30: mailing con suscripcion (sin activar)
+## Que se hizo el 2026-09-30
 
-Decision del usuario: servicio web propio + Tailscale Funnel (no Google o
-Microsoft Forms). Implementado y apagado por defecto: sin
-`COMPOSE_PROFILES=mailing` y `MAILING_ENABLED=true` produccion no cambia.
-
-- MySQL 8.4 (contenedor `mysql`, volumen `mysql-data`) con `subscribers` y
-  `subscriber_events` (`storage/subscribers.py`).
-- `app/subscription_server.py` (`python -m app.main web`, contenedor
-  `dmac-subscriptions` en `127.0.0.1:8080`): formulario, doble confirmacion,
-  baja por link y de un clic (RFC 8058). Confirmar/bajar solo por POST.
-- `EmailSender`: con mailing, un correo por suscriptor activo con link de
-  baja y `List-Unsubscribe`; si MySQL falla, va a `EMAIL_TO`.
-- CLI `python -m app.main subscribers count|list|add|remove|erase`.
-- `scripts/deploy.sh` hace `mysqldump` a `~/backups` si `mysql` corre.
-- 379 tests (43 nuevos). DDL y flujo verificados en nixbox contra un MySQL
-  8.4 desechable (ya eliminado; queda la imagen `mysql:8.4` descargada).
-- Desplegado `6b088ce` el 2026-09-30 (respaldo
-  `~/backups/dmac-20260930-203636.tgz`) con el mailing apagado. Envios del 29
-  y 30 (manana y cierre) salieron `sent`, todas las fuentes `ok`.
-- URL publica prevista: `https://nixbox.tailce797f.ts.net`. El tailnet aun
-  no tiene HTTPS (`CertDomains` vacio): habilitarlo en la consola.
-- Activacion paso a paso: DEPLOY.md, "Mailing con suscripcion".
-
-## Que se hizo el 2026-09-29 (tarde)
-
-1. **Brent -8%**: era el cambio de contrato de `BZ=F` (nov -> dic). El
-   cliente de yfinance ahora usa el contrato vigente (`underlyingSymbol`)
-   para todos los futuros `=F`; si Yahoo no responde, usa el continuo.
-2. **Diseno "Editorial"** (propuesta A del canvas de Claude Design
-   https://claude.ai/artifact/8FwBUAh8u3RYssbvkPodVJ): cabecera tipo
-   periodico, "Lo esencial" de Nix (Chile primero), cifras clave, mercados
-   agrupados, "En foco" en 2 columnas. Columnas fluidas que se apilan sin
-   `@media` y tabla `<!--[if mso]>` para Outlook de escritorio. Formato
-   chileno de numeros, Treasury en pb, tildes. `render_nix_editorial`
-   reemplaza el HTML de Nix duplicado en los jobs.
-3. **Modo oscuro y logo**: una paleta oscura propia fallo en Outlook nuevo
-   (la aplicaba segun el tema de Windows aunque el lector eligiera "fondo
-   claro", y encima convertia los colores). Se retiro: el correo es solo
-   claro (blanco puro, texto casi negro) y cada cliente lo invierte. El logo
-   va embebido (`cid:dmac-logo`, `assets/Dmac_logo_email.png` con fondo
-   blanco dentro del PNG), el remitente tiene nombre ("DMAC Brief · Nix") y
-   hay vista previa oculta con el titular de Nix. Textos chicos +1 px.
-4. **BCCh**: dolar observado, UF y cobre BML (diarias, con historia); IPC 12
-   meses e IMACEC; TPM/IPC/IMACEC/desempleo con periodo y cambio en pp.
-   Codigos verificados con `SearchSeries` y documentados en el README.
-5. **IPSA**: se evaluaron fuentes (README); el usuario aprobo `MXIPSAGC.SN`.
-
-## Verificado
-
-- Produccion con `239704e`: 17/17 yfinance, todas las series BCCh con dato,
-  Brent -1,07%, correo "[PRUEBA]" enviado a brcarom@udd.cl (68 KB).
-- Produccion con `3bc3087` (asunto con titular, logo embebido): correo
-  "[PRUEBA]" recibido bien en `dmac@udd.cl` (69 KB), todas las fuentes ok.
-- Local: capturas Chromium en 1200, 390 y 320 px. Solo
-  claro el correo pesa ~68 KB (limite de recorte de Gmail ~102 KB).
+1. **Mailing con suscripcion** (decision: servicio web propio + Tailscale
+   Funnel, no formularios externos): MySQL 8.4 con `subscribers` y
+   `subscriber_events`; `app/subscription_server.py` con formulario, doble
+   confirmacion, baja por link y de un clic (RFC 8058), confirmar/bajar
+   solo por POST; `EmailSender` envia un correo por suscriptor activo con
+   link de baja y `List-Unsubscribe` (si MySQL falla, va a `EMAIL_TO`); CLI
+   `subscribers count|list|add|remove|erase`; perfil `mailing` en compose;
+   `mysqldump` en `deploy.sh`. DDL verificado contra un MySQL 8.4 desechable.
+2. **Bienvenida e invitacion**: correo de bienvenida al confirmar; pie del
+   brief con "¿Te reenviaron este correo? Suscribete a DMAC Brief".
+3. **Nix**: `services/ai/editorial_polish.py` cambia codigos internos
+   ("USDCLP", "US30Y", "COPPER") por nombres legibles en el titular/asunto y
+   todo el texto, y corrige prefijos "Posible que" -> "Es posible que".
+4. **Produccion**: desplegado `6b088ce` y luego `33a0a67`; infraestructura
+   del mailing y Funnel activos, envio a suscriptores aun apagado. Envios
+   reales del 29 (cierre) y 30 (manana y cierre) `sent`, fuentes `ok`.
+5. **Pruebas del usuario**: correo de prueba con links reales a
+   brcarom@udd.cl; links funcionan desde el PC y, tras aparecer el DNS
+   publico, desde celulares.
 
 ## Decisiones del usuario (no re-discutir sin motivo)
 
@@ -117,56 +149,50 @@ Microsoft Forms). Implementado y apagado por defecto: sin
 - USD/PEN y desempleo desde el BCCh. DF como segunda fuente chilena (sin
   Opinion).
 - Destinatario del brief y de los avisos de operacion: `dmac@udd.cl`
-  (`EMAIL_TO` y `OPS_EMAIL_TO`, cambio pedido por el usuario el 2026-09-29).
-  Tras editar el `.env` de produccion: respaldarlo antes y recrear el
-  contenedor (`docker compose up -d --force-recreate`) para que lo lea.
+  (`EMAIL_TO` y `OPS_EMAIL_TO`). Tras editar el `.env` de produccion:
+  respaldarlo antes y recrear el contenedor
+  (`docker compose up -d --force-recreate`) para que lo lea.
 - Linea al lector con fuentes sin datos: si.
   Ultimo dato valido rotulado con fecha: si; la IA nunca lo recibe.
 - Cupo chileno 1 de 3 y filtro de comunicados administrativos: si.
-- Graficos del correo en HTML/CSS (sin imagenes); logo por URL.
+- Graficos del correo en HTML/CSS (sin imagenes).
 - Diseno "Editorial" (propuesta A) aprobado; debe ser responsivo.
 - USD/CLP de Yahoo en la tabla + dolar observado del BCCh como referencia.
 - Asunto con el titular de Nix ("DMAC Brief · 29 sep — <titular>").
-- Correo solo claro (sin paleta oscura propia) y logo embebido: el usuario
-  valido las visuales en Outlook el 2026-09-29.
+- Correo solo claro (sin paleta oscura propia) y logo embebido.
 - SMTP institucional de la UDD: el usuario lo pedira cuando el brief sea
   algo demostrable y en uso; por ahora sigue la cuenta Gmail.
-- IPSA desde yfinance con `MXIPSAGC.SN` (aprobado 2026-09-29). No buscar
-  otra fuente salvo que Yahoo deje de publicarlo.
+- IPSA desde yfinance con `MXIPSAGC.SN`. No buscar otra fuente salvo que
+  Yahoo deje de publicarlo.
 - Mailing: servicio web propio publicado con Tailscale Funnel, con doble
-  confirmacion y baja de un clic (2026-09-30). No usar formularios externos.
-- Suscripcion (2026-09-30): abierta a cualquier correo (no solo `@udd.cl`),
-  solo se pide el correo, ambas ediciones siempre, correo de bienvenida al
-  confirmar e invitacion "¿Te reenviaron este correo?" en el pie del brief.
-  Prueba visual de la baja enviada a brcarom@udd.cl y aprobada.
+  confirmacion y baja de un clic. No usar formularios externos.
+- Suscripcion: abierta a cualquier correo (no solo `@udd.cl`), solo se pide
+  el correo, ambas ediciones siempre, correo de bienvenida al confirmar e
+  invitacion "¿Te reenviaron este correo?" en el pie del brief.
+- Dominio propio: `dmac.cl` estaba libre en NIC Chile el 2026-09-30 (CLP
+  9.990/ano). El usuario evaluara una pagina web del club; si se compra,
+  Cloudflare (DNS + Tunnel) seria la alternativa a Funnel. Titular del
+  dominio: idealmente el club/UDD, no una persona.
 
 ## Trabajo pendiente (en orden sugerido)
 
-1. **Revisar Gmail y el celular**: Outlook nuevo (claro y oscuro) ya fue
-   validado por el usuario. Si el logo embebido falla en algun cliente,
-   volver a URL con `EMAIL_LOGO_URL=https://...`.
-2. **Revisar el cierre de las 18:30 del 2026-09-29** (primer envio real a
-   `dmac@udd.cl` con todo lo nuevo): `docker compose logs --since 1h dmac-market-brief-agent`
-   y `python -m app.main health` en el servidor.
-3. **Remitente institucional**: el correo sale de una cuenta Gmail
-   personal; Outlook UDD lo marca "remitente externo" y bloquea imagenes
-   externas. Una casilla del club o de la UDD mejoraria la entrega.
-4. **Router de temas IA intermitente**: respuesta vacia para "Estados
-   Unidos" (`Strict JSON parse failed ... char 0`). Ver reintento o
-   `AI_STRICT_JSON`.
-5. **Calidad de noticias** (`services/news_quality.py`): `HIGH_SIGNAL_TERMS`
-   y `LOW_VALUE_PATTERNS` por substring e incluyen el nombre de la fuente.
-   `impact_scoring` suma +1 a Latam/EE.UU./Global pero no a Chile.
-   La nota de DF del dolar quedo como region "EE.UU." en un envio anterior.
-6. **Nix**: codigos ("USDCLP") y prefijos rotos corregidos el 2026-09-30
-   (`services/ai/editorial_polish.py` + prompts). Falta mirar en correos
-   reales si quedan hechos copiados en ingles (solo lo pide el prompt).
-7. **Salud de fuentes**: calibrar umbrales tras ~2 semanas mirando `health`.
-8. **Activar el mailing con suscripcion**: implementado el 2026-09-30,
-   falta DEPLOY.md "Mailing con suscripcion" (pasos 1-5: `.env`, Funnel,
-   prueba desde un telefono, `subscribers add dmac@udd.cl`, encender).
-   Conviene junto con el SMTP institucional de la UDD. Pendientes en
-   `NEXT_STEPS.md`.
+1. **Auditoria de seguridad** (ver arriba). Bloquea encender el envio.
+2. **Frontend de las paginas de suscripcion** con logo (ver arriba).
+3. **Encender el mailing**: sembrar `subscribers add dmac@udd.cl`, decidir
+   si brcarom@udd.cl sigue en la lista, `MAILING_ENABLED=true` y
+   `docker compose up -d --force-recreate`. DEPLOY.md, paso 5.
+4. **Remitente institucional**: el correo sale de una cuenta Gmail
+   personal (~500 destinatarios/dia; cada suscriptor recibe 2). Pasar al
+   SMTP de la UDD antes de ~200 suscriptores.
+5. **Router de temas IA intermitente**: respuesta vacia para "Estados
+   Unidos" (`Strict JSON parse failed ... char 0`).
+6. **Calidad de noticias** (`services/news_quality.py`): `HIGH_SIGNAL_TERMS`
+   y `LOW_VALUE_PATTERNS` por substring e incluyen el nombre de la fuente;
+   `impact_scoring` no suma +1 a Chile.
+7. **Nix**: revisar en correos reales si quedan hechos copiados en ingles
+   (solo lo pide el prompt). El asunto del 30-09 decia "Treasury 10Y" (es
+   el `name` del activo, no un codigo).
+8. **Salud de fuentes**: calibrar umbrales tras ~2 semanas mirando `health`.
 9. Backlog de `NEXT_STEPS.md`: GET condicional, monitor mas liviano,
    deduplicacion O(n^2), paso (b) de IA en "En foco", proteger `main`
    exigiendo CI verde.

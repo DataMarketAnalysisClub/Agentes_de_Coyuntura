@@ -246,6 +246,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(24))"   # una para cada 
 COMPOSE_PROFILES=mailing        # levanta mysql y dmac-subscriptions
 MAILING_ENABLED=false           # aun no: primero probar altas y bajas
 MAILING_PUBLIC_URL=https://nixbox.<tailnet>.ts.net
+MAILING_HOST_PORT=8090          # 8080 lo usa nginx en nixbox
 MYSQL_PASSWORD=<generada>
 MYSQL_ROOT_PASSWORD=<generada>
 ```
@@ -258,7 +259,7 @@ en el `.env` no la cambia en la base.
 
 `scripts/deploy.sh --apply` como siempre. `docker compose ps` debe mostrar
 `dmac-mysql` y `dmac-subscriptions` como `healthy`, y
-`curl -fsS http://127.0.0.1:8080/salud` debe responder `ok` en el servidor.
+`curl -fsS http://127.0.0.1:8090/salud` debe responder `ok` en el servidor.
 
 ### 3. Publicar con Tailscale Funnel
 
@@ -267,9 +268,16 @@ activado y el atributo `funnel` permitido para `nixbox` en la politica de
 acceso. En el servidor:
 
 ```bash
-sudo tailscale funnel --bg 8080      # https://nixbox.<tailnet>.ts.net -> 127.0.0.1:8080
+sudo tailscale funnel --bg 8090      # https://nixbox.<tailnet>.ts.net -> 127.0.0.1:8090
 tailscale funnel status
 ```
+
+En `nixbox` el 8080 lo ocupa un nginx del sistema: el servicio usa
+`MAILING_HOST_PORT=8090` y Funnel apunta a ese puerto. Al encender Funnel la
+primera vez, el registro DNS publico tarda unos minutos en aparecer; desde el
+tailnet el nombre resuelve antes (a la IP 100.x), asi que una prueba desde un
+equipo con Tailscale no demuestra el acceso publico. Para apagarlo:
+`sudo tailscale funnel --https=443 off`.
 
 Funnel publica solo ese puerto; MySQL no tiene puertos publicados. La URL que
 muestra `funnel status` es la que va en `MAILING_PUBLIC_URL`.
