@@ -15,6 +15,27 @@ pasa a la calidad del brief (scraping y calificacion de noticias); ver
 `docs/news-scoring.md`. La auditoria de abajo sigue vigente para cuando se
 retome la parte web.
 
+**Deploy y mailing (2026-10-03, 20:03-20:10 Chile):**
+
+- Produccion en `3f03fe3` (calificacion de noticias, GET condicional, DF
+  ampliado). Respaldos: `~/backups/dmac-20261003-170221.tgz` y
+  `~/backups/mysql-20261003-170221.sql.gz`.
+- **Envio a suscriptores encendido** (decision del usuario): `MAILING_ENABLED=true`
+  y `MAILING_CONFIRM_MAX_PER_HOUR=10` (antes 60; peor caso ~240 correos/dia
+  en vez de ~1.440). Respaldo del `.env` previo:
+  `~/backups/env-20261003-200936.bak`. Primer envio a la lista: lunes
+  2026-10-05 08:30.
+- Motivo: dos personas confirmaron el 2026-10-02 y recibieron la bienvenida,
+  pero el brief seguia yendo solo a `dmac@udd.cl`.
+- Lista al encender: 4 `active` (`dmac@udd.cl` sembrado con `subscribers add`,
+  `brcarom@udd.cl` se mantiene por decision del usuario y 2 altas reales de
+  @udd.cl) y 3 `pending` (2 pruebas del usuario que vencen solas y 1 alta
+  real sin confirmar). Sin bajas ni senales de abuso (maximo 3
+  confirmaciones en una hora).
+- La app no escribe archivos en `logs/` y los logs de Docker se pierden al
+  recrear contenedores: la auditoria de envios esta en la tabla
+  `sent_emails` de la SQLite.
+
 ## Siguiente mision: auditoria completa de seguridad
 
 Desde el 2026-09-30 el proyecto tiene una superficie publica en internet (el
