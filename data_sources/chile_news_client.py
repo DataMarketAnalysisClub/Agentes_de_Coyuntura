@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 from app.http_client import CircuitBreakerError, ResilientHttpClient
-from data_sources.rss_news_client import RawNewsItem, parse_feed
+from data_sources.rss_news_client import RawNewsItem, fetch_feed
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +74,7 @@ class ChileNewsClient:
 
     def _fetch_df(self) -> list[RawNewsItem]:
         try:
-            response = self._get_client("df_news").get(DF_RSS_URL)
-            items = parse_feed(response.content, "Diario Financiero")
+            items = fetch_feed(self._get_client("df_news"), DF_RSS_URL, "Diario Financiero")
         except CircuitBreakerError:
             raise
         except Exception as exc:
@@ -101,8 +100,7 @@ class ChileNewsClient:
 
     def _fetch_latercera_pulso_rss(self) -> list[RawNewsItem]:
         try:
-            response = self._get_client().get(LATERCERA_PULSO_RSS_URL)
-            items = parse_feed(response.content, "La Tercera Pulso")
+            items = fetch_feed(self._get_client(), LATERCERA_PULSO_RSS_URL, "La Tercera Pulso")
         except CircuitBreakerError:
             raise
         except Exception as exc:

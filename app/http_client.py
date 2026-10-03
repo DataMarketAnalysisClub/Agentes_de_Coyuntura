@@ -134,6 +134,10 @@ class ResilientHttpClient:
         self, method: str, url: str, timeout: float, **kwargs: Any
     ) -> httpx.Response:
         response = self._client.request(method, url, timeout=timeout, **kwargs)
+        # 304 Not Modified es la respuesta normal de un GET condicional
+        # (`If-None-Match`/`If-Modified-Since`): el llamador reutiliza su copia.
+        if response.status_code == 304:
+            return response
         # Sin esto, un 4xx/5xx se trataba como exito: no se reintentaba el 5xx,
         # el circuit breaker no lo contaba y el llamador parseaba la pagina de
         # error como si fuera contenido.

@@ -77,6 +77,16 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
+def _empty_feed_cache():
+    """El cache del GET condicional es global: un test no ve los feeds de otro."""
+    from data_sources.rss_news_client import clear_feed_cache
+
+    clear_feed_cache()
+    yield
+    clear_feed_cache()
+
+
+@pytest.fixture(autouse=True)
 def _ignore_local_env_file(monkeypatch):
     """Los tests no leen el `.env` local (credenciales reales, SMTP, IA).
 

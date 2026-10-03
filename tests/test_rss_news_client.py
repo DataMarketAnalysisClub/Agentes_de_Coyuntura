@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import httpx
 
 from app.config import Settings
-from data_sources.rss_news_client import RssFeed, RssNewsClient, parse_feed
+from data_sources.rss_news_client import RssFeed, RssNewsClient, fetch_feed, parse_feed
 
 INVESTING_STYLE_RSS = """<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>Investing</title>
@@ -89,3 +89,55 @@ def test_http_client_is_per_host() -> None:
     assert fed is fed_again
     assert fed is not ecb
     assert fed.name == "rss:www.federalreserve.gov"
+
+
+class ConditionalResponse:
+    def __init__(self, status_code: int, text: str = "", headers: dict[str, str] | None = None) -> None:
+        self.status_code = status_code
+        self.content = text.encode("utf-8")
+        self.headers = headers or {}
+
+
+class ConditionalHttpClient:
+    """Responde 304 si llegan los validadores de la respuesta anterior."""
+
+    def __init__(self, text: str, headers: dict[str, str]) -> None:
+        self.text = text
+        self.headers = headers
+        self.sent_headers: list[dict[str, str]] = []
+
+    def get(self, url: str, headers: dict[str, str] | None = None) -> ConditionalResponse:
+        self.sent_headers.append(dict(headers or {}))
+        if headers and headers.get("If-None-Match") == self.headers.get("etag"):
+            return ConditionalResponse(304)
+        return ConditionalResponse(200, self.text, self.headers)
+
+
+def test_fetch_feed_reuses_items_on_304() -> None:
+    http = ConditionalHttpClient(HTML_SUMMARY_RSS, {"etag": '"v1"', "last-modified": "Mon, 28 Sep 2026 18:34:03 GMT"})
+
+    first = fetch_feed(http, "https://example.com/rss", "Feed")
+    second = fetch_feed(http, "https://example.com/rss", "Feed")
+
+    assert http.sent_headers[0] == {}
+    assert http.sent_headers[1] == {"If-None-Match": '"v1"', "If-Modified-Since": "Mon, 28 Sep 2026 18:34:03 GMT"}
+    assert second == first
+    assert second[0].title == "Fed & tasas"
+
+
+def test_fetch_feed_without_validators_always_downloads() -> None:
+    http = ConditionalHttpClient(HTML_SUMMARY_RSS, {})
+
+    fetch_feed(http, "https://example.com/df", "DF")
+    fetch_feed(http, "https://example.com/df", "DF")
+
+    assert http.sent_headers == [{}, {}]
+
+
+def test_http_client_returns_304_without_raising() -> None:
+    from app.http_client import ResilientHttpClient
+
+    client = ResilientHttpClient(name="test-304", retries=1)
+    client._client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(304)))
+
+    assert client.get("https://example.com/rss", headers={"If-None-Match": '"v1"'}).status_code == 304

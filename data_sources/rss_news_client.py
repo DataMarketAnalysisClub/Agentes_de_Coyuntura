@@ -2,6 +2,7 @@ import calendar
 import html
 import logging
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -46,6 +47,57 @@ DEFAULT_RSS_FEEDS: tuple[RssFeed, ...] = (
     RssFeed("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
     RssFeed("Investing.com", "https://www.investing.com/rss/news.rss"),
 )
+
+
+@dataclass(frozen=True)
+class _CachedFeed:
+    etag: str
+    last_modified: str
+    items: tuple[RawNewsItem, ...]
+
+
+# GET condicional: por URL, los validadores y las notas de la ultima descarga.
+# Vive lo que el proceso (el scheduler corre dias); el monitor de alto impacto
+# pide los mismos feeds cada 15 minutos y la mayoria no cambia entre corridas.
+_FEED_CACHE: dict[str, _CachedFeed] = {}
+_FEED_CACHE_LOCK = threading.Lock()
+
+
+def clear_feed_cache() -> None:
+    with _FEED_CACHE_LOCK:
+        _FEED_CACHE.clear()
+
+
+def fetch_feed(http_client, url: str, source: str) -> list[RawNewsItem]:
+    """Descarga y parsea un feed con `If-None-Match`/`If-Modified-Since`.
+
+    Si el servidor responde 304, devuelve las notas de la descarga anterior
+    (con sus fechas reales: la salud de fuentes sigue viendo su frescura).
+    Feeds sin `ETag` ni `Last-Modified` (DF) se piden completos siempre.
+    """
+    with _FEED_CACHE_LOCK:
+        cached = _FEED_CACHE.get(url)
+    headers = {}
+    if cached is not None:
+        if cached.etag:
+            headers["If-None-Match"] = cached.etag
+        if cached.last_modified:
+            headers["If-Modified-Since"] = cached.last_modified
+    response = http_client.get(url, headers=headers) if headers else http_client.get(url)
+    if cached is not None and getattr(response, "status_code", 200) == 304:
+        logger.info("RSS feed not modified, reusing cached items", extra={"source": source})
+        return list(cached.items)
+
+    items = parse_feed(response.content, source)
+    response_headers = getattr(response, "headers", None) or {}
+    etag = response_headers.get("etag", "")
+    last_modified = response_headers.get("last-modified", "")
+    with _FEED_CACHE_LOCK:
+        if items and (etag or last_modified):
+            _FEED_CACHE[url] = _CachedFeed(etag, last_modified, tuple(items))
+        else:
+            _FEED_CACHE.pop(url, None)
+    return items
 
 
 def _feed_from_url(url: str) -> RssFeed:
@@ -122,8 +174,7 @@ class RssNewsClient:
         # Antes, si la request fallaba se reintentaba con feedparser.parse(url),
         # que hace su propia descarga sin timeout ni circuit breaker: duplicaba
         # la espera en feeds caidos. Ahora el error se propaga y se omite el feed.
-        response = self.http_client_for(feed).get(feed.url)
-        return parse_feed(response.content, feed.source)
+        return fetch_feed(self.http_client_for(feed), feed.url, feed.source)
 
     @staticmethod
     def _entry_timestamp(entry: object) -> datetime:
