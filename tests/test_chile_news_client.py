@@ -35,6 +35,7 @@ DF_RSS = """<?xml version="1.0" encoding="UTF-8"?>
   <category>Mercados</category>
   <link>http://www.df.cl/mercados/bolsa-monedas/dolar-abre-a-la-baja</link>
   <description>El peso chileno se aprecia.</description>
+  <df:tagnames>dólar hoy,Banco Central,Francisco Noguera</df:tagnames>
 </item>
 <item>
   <pubDate>Tue, 29 Sep 2026 12:00:00 GMT</pubDate>
@@ -47,6 +48,24 @@ DF_RSS = """<?xml version="1.0" encoding="UTF-8"?>
   <title>Puerto de Valparaiso amplia su terminal</title>
   <category>Regiones</category>
   <link>http://www.df.cl/regiones/valparaiso/puerto-amplia-terminal</link>
+</item>
+<item>
+  <pubDate>Tue, 29 Sep 2026 10:00:00 GMT</pubDate>
+  <title>BC enfria expectativas: la reactivacion no bastara para volver al 6,5%</title>
+  <category>Señal DF</category>
+  <link>http://www.df.cl/senal-df/factor-economico/bc-enfria-expectativas</link>
+</item>
+<item>
+  <pubDate>Tue, 29 Sep 2026 09:00:00 GMT</pubDate>
+  <title>Los nuevos socios de un viñatero en sus vinos mas exclusivos</title>
+  <category>Señal DF</category>
+  <link>http://www.df.cl/senal-df/datos-de-sobremesa/nuevos-socios-vinos</link>
+</item>
+<item>
+  <pubDate>Tue, 29 Sep 2026 08:00:00 GMT</pubDate>
+  <title>Guia de Ocio: una historia real en streaming</title>
+  <category>DF MAS</category>
+  <link>http://www.df.cl/df-mas/capital/guia-de-ocio</link>
 </item>
 </channel></rss>"""
 
@@ -129,6 +148,24 @@ class TestChileNewsClient:
         requested = [url for url in _requested_urls(mock_http_client) if url != DF_RSS_URL]
         assert requested == [LATERCERA_PULSO_RSS_URL, LATERCERA_PULSO_HTML_URL]
 
+    def test_df_reads_the_whole_portada_feed(self, client: ChileNewsClient, mock_http_client: MagicMock) -> None:
+        # La portada trae ~50 notas; antes se cortaba en 30 antes de filtrar.
+        items_xml = "".join(
+            f"<item><pubDate>Tue, 29 Sep 2026 13:00:00 GMT</pubDate><title>Nota {idx}</title>"
+            f"<link>http://www.df.cl/mercados/bolsa-monedas/nota-{idx}</link></item>"
+            for idx in range(50)
+        )
+        mock_http_client.get.side_effect = _responses_by_url(
+            {
+                LATERCERA_PULSO_RSS_URL: LATERCERA_RSS,
+                DF_RSS_URL: f'<?xml version="1.0"?><rss version="2.0"><channel><title>DF</title>{items_xml}</channel></rss>',
+            }
+        )
+
+        df_items = [item for item in client.fetch_latest() if item.source == "Diario Financiero"]
+
+        assert len(df_items) == 40  # DF_MAX_ITEMS, despues de filtrar por seccion
+
     def test_fetch_latest_includes_diario_financiero_news_sections_only(
         self, client: ChileNewsClient, mock_http_client: MagicMock
     ) -> None:
@@ -139,9 +176,15 @@ class TestChileNewsClient:
         items = client.fetch_latest()
 
         df_items = [item for item in items if item.source == "Diario Financiero"]
-        assert [item.title for item in df_items] == ["Dolar abre a la baja por el cobre"]
+        # Fuera: Opinion, Senal DF "datos de sobremesa" y DF Mas.
+        assert [item.title for item in df_items] == [
+            "Dolar abre a la baja por el cobre",
+            "Puerto de Valparaiso amplia su terminal",
+            "BC enfria expectativas: la reactivacion no bastara para volver al 6,5%",
+        ]
         assert df_items[0].url == "https://www.df.cl/mercados/bolsa-monedas/dolar-abre-a-la-baja"
         assert df_items[0].timestamp == datetime(2026, 9, 29, 13, 5, 54, tzinfo=UTC)
+        assert df_items[0].tags == ("Mercados", "dólar hoy", "Banco Central", "Francisco Noguera")
         assert any(item.source == "La Tercera Pulso" for item in items)
 
     def test_fetch_latest_continues_when_diario_financiero_fails(

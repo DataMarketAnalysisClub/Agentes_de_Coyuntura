@@ -161,6 +161,16 @@ empeore la calificacion sin que nadie lo note.
    MarketWatch e Investing.com responden 304; La Tercera ignora los
    validadores y DF no los envia.
 
+6. **Diario Financiero** (`chile_news_client.py`): se lee la portada
+   completa (~50 notas; antes se cortaba en 30), filtro por subseccion
+   (entran Regiones y las subsecciones de economia y mercados de Senal DF) y
+   etiquetas del feed (`df:tagnames`) para el tema. Con la portada del
+   2026-10-03: de 8 a 36 notas y de 4 a 21 que pasan el filtro. Las
+   etiquetas no se usan para la region: DF pone "Estados Unidos" en notas
+   chilenas que solo lo mencionan. DF no publica feeds por seccion (404) y
+   su sitemap trae URLs sin bajada, asi que el RSS de portada sigue siendo la
+   fuente.
+
 ### Verificado y descartado
 
 - **Resumen para Investing.com**: ninguno de sus feeds trae descripcion

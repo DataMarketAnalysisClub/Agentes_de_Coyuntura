@@ -94,10 +94,15 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
 - La Tercera Pulso: negocios y economia chilena. Se lee desde su RSS oficial
   (Arc Publishing, con fecha de publicacion real); el scraping del HTML del
   canal queda solo como respaldo si el RSS no entrega notas.
-- Diario Financiero: RSS de portada (`df.cl/noticias/site/list/port/rss.xml`).
-  Solo se usan titulo, bajada y link del feed (no se descarga el articulo).
-  Se conservan las secciones Mercados, Economia y Politica, Empresas,
-  Internacional y Primer Click; Opinion, Regiones y suplementos se descartan.
+- Diario Financiero: RSS de portada (`df.cl/noticias/site/list/port/rss.xml`,
+  ~50 notas; DF no publica feeds por seccion). Solo se usan titulo, bajada,
+  etiquetas (`df:tagnames`) y link del feed (no se descarga el articulo:
+  paywall). Se leen todas las notas del feed y se conservan Mercados,
+  Economia y Politica, Empresas, Internacional, Regiones y las subsecciones
+  de Senal DF Factor Economico, Senales Financieras, El Deal, La Minuta y En
+  la mente del CFO. Fuera: Opinion, DF Mas, Doble Click, Datos de Sobremesa y
+  los resumenes semanales. Las etiquetas ayudan a clasificar el tema (no la
+  region).
 - Ambas fuentes chilenas se descargan en paralelo, cada una con su propio
   circuit breaker.
 

@@ -21,13 +21,31 @@ LATERCERA_PULSO_RSS_URL = f"{LATERCERA_BASE_URL}/arc/outboundfeeds/rss/category/
 LATERCERA_PULSO_HTML_URL = f"{LATERCERA_BASE_URL}/canal/pulso/"
 LATERCERA_MAX_ITEMS = 20
 
-# RSS de portada de Diario Financiero: ~50 notas con fecha. Solo se usan
-# titulo, bajada y link del feed (no se descarga el articulo: DF tiene
-# paywall). Se conservan las secciones de hechos economicos; Opinion (cartas,
-# columnas, editorial), Regiones y suplementos quedan fuera.
+# RSS de portada de Diario Financiero: ~50 notas con fecha y etiquetas
+# (`df:tagnames`). Solo se usan titulo, bajada, etiquetas y link del feed (no
+# se descarga el articulo: DF tiene paywall). DF no publica feeds por seccion
+# (2026-10-03: todos 404), asi que se filtra por la ruta del link.
 DF_RSS_URL = "https://www.df.cl/noticias/site/list/port/rss.xml"
-DF_ALLOWED_SECTIONS = frozenset({"mercados", "economia-y-politica", "empresas", "internacional", "primer-click"})
-DF_MAX_ITEMS = 20
+# Secciones de hechos economicos. Regiones entra: el filtro de calidad deja
+# pasar solo lo macro ("Contraccion de 1,5% y desempleo de 10% en Biobio").
+DF_ALLOWED_SECTIONS = frozenset({"mercados", "economia-y-politica", "empresas", "internacional", "regiones"})
+# Senal DF es la seccion mas grande de la portada y mezcla analisis de primer
+# nivel con notas sociales: solo sus subsecciones de economia y mercados.
+# Fuera: "datos-de-sobremesa" (trascendidos), y los resumenes "doble-shot" y
+# "primer-click-de-la-semana" (su titular junta varias historias).
+DF_ALLOWED_SUBSECTIONS = frozenset(
+    {
+        "senal-df/factor-economico",
+        "senal-df/senales-financieras",
+        "senal-df/el-deal",
+        "senal-df/la-minuta",
+        "senal-df/en-la-mente-del-cfo",
+    }
+)
+# Opinion (cartas, columnas, editorial), DF Mas (estilo de vida), Doble Click
+# (resumen horario) y suplementos quedan fuera por no estar en las listas.
+DF_FEED_MAX_ITEMS = 60
+DF_MAX_ITEMS = 40
 
 
 class ChileNewsClient:
@@ -74,7 +92,7 @@ class ChileNewsClient:
 
     def _fetch_df(self) -> list[RawNewsItem]:
         try:
-            items = fetch_feed(self._get_client("df_news"), DF_RSS_URL, "Diario Financiero")
+            items = fetch_feed(self._get_client("df_news"), DF_RSS_URL, "Diario Financiero", DF_FEED_MAX_ITEMS)
         except CircuitBreakerError:
             raise
         except Exception as exc:
@@ -86,7 +104,7 @@ class ChileNewsClient:
         selected = [
             replace(item, url=item.url.replace("http://", "https://", 1))
             for item in items
-            if _df_section(item.url) in DF_ALLOWED_SECTIONS
+            if is_df_news_section(item.url)
         ]
         return selected[:DF_MAX_ITEMS]
 
@@ -203,6 +221,9 @@ class ChileNewsClient:
         return datetime.now(UTC)
 
 
-def _df_section(url: str) -> str:
-    """Primer segmento de la ruta: "mercados" en df.cl/mercados/bolsa-monedas/..."""
-    return urlparse(url).path.strip("/").split("/", 1)[0]
+def is_df_news_section(url: str) -> bool:
+    """Seccion de hechos economicos segun la ruta: df.cl/<seccion>/<subseccion>/..."""
+    parts = urlparse(url).path.strip("/").split("/")
+    if parts[0] in DF_ALLOWED_SECTIONS:
+        return True
+    return len(parts) > 1 and f"{parts[0]}/{parts[1]}" in DF_ALLOWED_SUBSECTIONS

@@ -5,7 +5,7 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from urllib.parse import urlparse
@@ -38,6 +38,9 @@ class RawNewsItem:
     title: str
     url: str
     summary: str
+    # Etiquetas del medio (categorias RSS y, en DF, `df:tagnames`): ayudan a
+    # clasificar el tema. Solo en memoria; no se muestran ni se guardan.
+    tags: tuple[str, ...] = field(default=(), compare=False)
 
 
 DEFAULT_RSS_FEEDS: tuple[RssFeed, ...] = (
@@ -68,7 +71,9 @@ def clear_feed_cache() -> None:
         _FEED_CACHE.clear()
 
 
-def fetch_feed(http_client, url: str, source: str) -> list[RawNewsItem]:
+def fetch_feed(
+    http_client, url: str, source: str, max_items: int = RSS_MAX_ITEMS_PER_FEED
+) -> list[RawNewsItem]:
     """Descarga y parsea un feed con `If-None-Match`/`If-Modified-Since`.
 
     Si el servidor responde 304, devuelve las notas de la descarga anterior
@@ -88,7 +93,7 @@ def fetch_feed(http_client, url: str, source: str) -> list[RawNewsItem]:
         logger.info("RSS feed not modified, reusing cached items", extra={"source": source})
         return list(cached.items)
 
-    items = parse_feed(response.content, source)
+    items = parse_feed(response.content, source, max_items)
     response_headers = getattr(response, "headers", None) or {}
     etag = response_headers.get("etag", "")
     last_modified = response_headers.get("last-modified", "")
@@ -181,21 +186,33 @@ class RssNewsClient:
         return entry_timestamp(entry)
 
 
-def parse_feed(content: bytes | str, source: str) -> list[RawNewsItem]:
+def parse_feed(content: bytes | str, source: str, max_items: int = RSS_MAX_ITEMS_PER_FEED) -> list[RawNewsItem]:
     parsed = feedparser.parse(content)
 
     if getattr(parsed, "bozo", False) and not parsed.entries:
         logger.warning("RSS feed returned parse warning", extra={"source": source})
 
     items: list[RawNewsItem] = []
-    for entry in parsed.entries[:RSS_MAX_ITEMS_PER_FEED]:
+    for entry in parsed.entries[:max_items]:
         title = clean_text(str(getattr(entry, "title", "")))
         url = str(getattr(entry, "link", "")).strip()
         if not title or not url:
             continue
         summary = clean_text(str(getattr(entry, "summary", "")))
-        items.append(RawNewsItem(entry_timestamp(entry), source, title, url, summary))
+        items.append(RawNewsItem(entry_timestamp(entry), source, title, url, summary, entry_tags(entry)))
     return items
+
+
+def entry_tags(entry: object) -> tuple[str, ...]:
+    """Categorias RSS (`<category>`) y palabras clave de DF (`<df:tagnames>`)."""
+    terms = [str(tag.get("term", "")) for tag in getattr(entry, "tags", None) or []]
+    terms += str(getattr(entry, "df_tagnames", "") or "").split(",")
+    seen: dict[str, None] = {}
+    for term in terms:
+        cleaned = clean_text(term)
+        if cleaned:
+            seen.setdefault(cleaned, None)
+    return tuple(seen)
 
 
 def clean_text(value: str) -> str:

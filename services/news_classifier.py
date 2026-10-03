@@ -181,15 +181,20 @@ def classify_region(title: str, summary: str = "", default: str = "Global") -> s
     return default
 
 
-def classify_topic(title: str, summary: str = "") -> str:
+def classify_topic(title: str, summary: str = "", tags: Iterable[str] = ()) -> str:
     """Tema con mas menciones, ponderando el titulo sobre el resumen.
+
+    `tags` son las etiquetas editoriales del medio ("desempleo", "Bolsa
+    chilena"); cuentan como el resumen. No se usan para la region: DF etiqueta
+    "Estados Unidos" en notas chilenas que solo lo mencionan.
 
     Antes ganaba el primer tema con alguna mencion, y como "tasas" va primero,
     "la tasa de desocupacion" en el resumen volvia "tasas" una nota laboral.
     Los empates se resuelven por el orden de `TOPIC_KEYWORDS`.
     """
     title_text = normalize_text(title)
-    summary_text = normalize_text(summary)
+    # Las etiquetas se separan con "|" para que una frase no cruce de una a otra.
+    summary_text = normalize_text(" | ".join([summary, *tags]))
     best_topic, best_score = "macro general", 0.0
     for topic, pattern in _TOPIC_PATTERNS.items():
         masked = _TOPIC_MASKED_PATTERNS.get(topic)
@@ -278,6 +283,7 @@ def deduplicate_news(items: Iterable[RawNewsItem]) -> list[RawNewsItem]:
                 title=item.title,
                 url=canonical_url,
                 summary=item.summary,
+                tags=item.tags,
             )
         )
     return unique
@@ -294,7 +300,7 @@ def classify_news(items: Iterable[RawNewsItem]) -> list[NewsItem]:
                 url=item.url,
                 summary=item.summary,
                 region=classify_region(item.title, item.summary, default_region(item.source, item.url)),
-                topic=classify_topic(item.title, item.summary),
+                topic=classify_topic(item.title, item.summary, item.tags),
             )
         )
     return classified

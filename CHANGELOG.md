@@ -23,6 +23,18 @@ nuevas que las reglas no habian visto, el F1 del filtro de calidad subio de
   "Treasury Department" ya no se asocia al Treasury 10Y.
 - Region: lideres latinoamericanos (Lula, Milei, Sheinbaum...), G7/G20/OPEP.
 
+### Cambiado (Diario Financiero)
+- Se leen las ~50 notas de la portada (antes se cortaba en 30 antes de
+  filtrar) y hasta 40 pasan al pipeline (antes 20).
+- Filtro por subseccion: entran Regiones y Senal DF (Factor Economico,
+  Senales Financieras, El Deal, La Minuta, En la mente del CFO), que es la
+  seccion mas grande de la portada; quedan fuera Datos de Sobremesa, DF Mas,
+  Doble Click y los resumenes semanales. "Primer Click", antes permitido, se
+  mudo a Senal DF como resumen semanal.
+- Las etiquetas del feed (`df:tagnames` y categorias RSS) cuentan para el tema
+  de la nota. Medido con la portada del 2026-10-03: DF paso de 8 a 36 notas y
+  de 4 a 21 que pasan el filtro de calidad.
+
 ### Agregado
 - `python -m scripts.evaluate_news_scoring` y conjuntos etiquetados en
   `tests/fixtures/` (160 notas de desarrollo + 63 de control), con pisos de

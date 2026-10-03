@@ -172,3 +172,18 @@ def test_deduplicate_news_keeps_first_and_compares_only_titles_sharing_words() -
     ]
 
     assert [item.source for item in deduplicate_news(items)] == ["A", "C", "D"]
+
+
+def test_tags_help_the_topic_but_not_the_region() -> None:
+    # Nota real de Senal DF (2026-10-03): el titular no nombra el tema.
+    title = "Gobierno sale a buscar en Asia y Medio Oriente para no depender de EEUU"
+    tags = ("combustible", "Energía", "ENAP", "Estados Unidos", "China")
+
+    assert classify_topic(title) == "macro general"
+    assert classify_topic(title, "", tags) == "commodities"
+    items = classify_news(
+        [RawNewsItem(datetime(2026, 10, 3, tzinfo=UTC), "Diario Financiero", "Gobierno sale a buscar diesel",
+                     "https://www.df.cl/senal-df/el-deal/gobierno-sale-a-buscar-diesel", "", tags)]
+    )
+    assert items[0].region == "Chile"
+    assert items[0].topic == "commodities"
