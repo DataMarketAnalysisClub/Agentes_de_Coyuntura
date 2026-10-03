@@ -1,8 +1,9 @@
 # Calificacion de noticias: diagnostico y hoja de ruta
 
 Estado al 2026-10-03. Resume la evaluacion de Kev como calificador de
-noticias, mide como se comportan las reglas actuales con noticias reales y
-propone por donde avanzar. Backlog general en `NEXT_STEPS.md`.
+noticias, el diagnostico de las reglas con noticias reales, lo implementado
+(seccion 3) y lo que queda abierto (seccion 4). Backlog general en
+`NEXT_STEPS.md`.
 
 ## 1. Kev (descartado por ahora)
 
@@ -36,7 +37,7 @@ el dominio y la pagina web, o GPU por horas). El esquema de preguntas
 modelo de Ollama Cloud que ya se usa, sin calibracion, y cambiar el backend
 despues. La IA seguiria solo calificando candidatos; nunca agregando notas.
 
-## 2. Diagnostico de las reglas actuales
+## 2. Diagnostico inicial de las reglas
 
 Medido sobre las 160 notas de `storage/dmac_market_brief.db` local
 (2026-09-28 19:38 a 2026-09-29 17:52 UTC). Es un solo dia: los numeros son
@@ -99,52 +100,93 @@ indicativos, no una evaluacion.
    suerte ("fed" calza con "fedex", "oil" con "turmoil", "tech" con
    "fintech").
 
-## 3. Hoja de ruta propuesta
+## 3. Implementado (2026-10-03)
 
-Ordenada por impacto/esfuerzo. Todo deterministico, con tests de regresion
-por cada ejemplo real citado arriba.
+### Resultados
 
-### Fase 1: corregir las reglas (sin dependencias nuevas)
+Conjuntos etiquetados a mano en `tests/fixtures/` (relevante si/no y, si es
+relevante, tema y region). Los evalua
+`python -m scripts.evaluate_news_scoring [--file ...] [--details]`.
 
-1. **Tema por puntaje, no por orden:** contar coincidencias por tema,
-   ponderando el titulo sobre el resumen (como `select_news_charts`), y
-   desempatar por especificidad.
-2. **Vocabulario en espanol y una sola fuente de verdad:** que
-   "alta senal" se derive de los temas detectados (tema distinto de
-   "macro general") en vez de una lista paralela; agregar los terminos que
-   faltan y Lula/Bolsonaro/Milei/Sheinbaum... a Latam.
-3. **Patrones de bajo valor nuevos:** analisis tecnico ("live levels",
-   "support and resistance", "52-week low") y finanzas personales en primera
-   persona ("i'm NN years old", "should i").
-4. **Cobertura multi-fuente** en lugar del +1 por tema: +1 si otra fuente
-   publica una nota similar, +2 si son dos o mas.
-5. **Busqueda por palabra completa** en `news_quality.py` e
-   `impact_scoring.py`, reutilizando `_compile_keywords`.
+| Metrica | Desarrollo (160) antes | Desarrollo despues | Control (63) antes | Control 1a medicion | Control final |
+|---|---|---|---|---|---|
+| Precision del filtro | 0.82 | 0.91 | 0.47 | 0.58 | 0.75 |
+| Recall del filtro | 0.57 | 0.91 | 0.39 | 0.78 | 0.83 |
+| F1 | 0.68 | 0.91 | 0.42 | 0.67 | 0.79 |
+| precision@10 del ranking | 1.00 | 1.00 | 0.50 | 0.60 | 0.80 |
+| Tema correcto | 0.57 | 0.77 | 0.39 | 0.72 | 0.72 |
+| Region correcta | 0.77 | 0.83 | 0.83 | 0.89 | 0.94 |
 
-### Fase 2: conjunto de evaluacion
+Como leer la tabla:
 
-Sin un conjunto etiquetado no se puede saber si un cambio mejora o empeora.
+- **Desarrollo** (`news_eval.jsonl`, 28-29 sep): las reglas se ajustaron
+  mirando este conjunto; sus numeros son optimistas.
+- **Control** (`news_eval_holdout.jsonl`, 1-3 oct): etiquetado antes de
+  correr las reglas. La **1a medicion** es la unica independiente. Despues
+  se corrigieron errores vistos en el (fuentes oficiales, "Treasury
+  Department", notas de carrera), asi que la columna final ya no lo es.
+  Para la proxima medicion honesta hace falta un conjunto nuevo.
+- Las etiquetas las puso Claude con criterio editorial ("¿la consideraria
+  un editor del brief como candidata a titular?"); conviene que alguien del
+  club las revise.
 
-- Exportar unas 200-300 notas reales (idealmente de la SQLite de produccion,
-  que tiene varias semanas) y etiquetarlas a mano: relevante si/no, tema,
-  region.
-- Script `scripts/evaluate_news_scoring.py` que reporte precision/recall del
-  filtro y exactitud de tema/region. Correrlo antes y despues de cada cambio.
-- El mismo conjunto sirve para comparar despues Kev u otro modelo.
+`tests/test_news_scoring_eval.py` fija pisos para que un cambio de reglas no
+empeore la calificacion sin que nadie lo note.
 
-### Fase 3: scraping
+### Cambios
 
-1. **Resumen para Investing.com:** el feed no trae descripcion. Evaluar
-   feeds por seccion de Investing.com o bajar su peso.
-2. **GET condicional** (`ETag`/`Last-Modified`), ya en el backlog.
-3. **Fuentes oficiales chilenas:** comunicados del BCCh, CMF, INE y Hacienda
-   (hoy aparecen en `SOURCE_TIERS` pero no hay feed). Verificar si publican
-   RSS antes de comprometerse.
-4. **Deduplicacion por tokens** en vez de `SequenceMatcher` O(n^2); tambien
-   habilita la senal de cobertura multi-fuente.
+1. **Tema por puntaje** (`classify_topic`): titular x3, resumen x1; empate
+   por orden de `TOPIC_KEYWORDS` (macro antes que mercado, FX antes que
+   commodities). Frases enmascaradas por tema: "tasa de desocupacion" no es
+   "tasas"; "el fiscal", "terreno fiscal" o "fiscal year" no son politica
+   fiscal. Vocabulario en espanol y bancos centrales nuevos.
+2. **Filtro de calidad** (`news_quality.py`): palabras completas, sin el
+   nombre de la fuente en el texto; los temas macro cuentan como senal.
+   Fuentes oficiales tambien necesitan senal, sin contar su propio nombre.
+   En fuentes tier 3 (MarketWatch, Investing.com) solo los temas de mercado
+   (tasas, inflacion, bancos centrales, FX, commodities) bastan; empleo,
+   actividad o fiscal necesitan un termino macro. Patrones de ruido nuevos:
+   "...: Live levels", primera persona ("I'm 80", "my husband", "should I"),
+   "price target", avisos de fondos, "comment period".
+3. **Impacto** (`impact_scoring.py`): cobertura multi-fuente (+1 si otra
+   fuente publica la misma historia, +2 si son dos o mas) en vez del +1 por
+   tema; palabras completas; "Treasury Department" no activa el Treasury 10Y.
+   Chile no estaba sin bono de region: la palabra clave "chile" calza con la
+   etiqueta de region que se agrega al texto (+2), por eso no se toco.
+4. **Deduplicacion**: indice por palabras (cada titulo se compara solo con
+   los que comparten alguna) y `is_same_story` (Jaccard >= 0.5 de palabras
+   significativas) para la cobertura multi-fuente.
+5. **GET condicional** (`fetch_feed`): `If-None-Match`/`If-Modified-Since`
+   con cache en memoria del proceso. Verificado en vivo: Fed, BCE, FT,
+   MarketWatch e Investing.com responden 304; La Tercera ignora los
+   validadores y DF no los envia.
 
-### Fase 4: modelo como calificador (opcional)
+### Verificado y descartado
 
-Con el conjunto de evaluacion listo, probar el esquema de preguntas de Kev
-sobre los candidatos que pasan las reglas, primero con Ollama Cloud. Solo se
-activa si mejora la evaluacion; si falla, `warning` y se usan las reglas.
+- **Resumen para Investing.com**: ninguno de sus feeds trae descripcion
+  (probados `news.rss` y las secciones 1, 11, 14, 25 y 95). Se compenso
+  filtrando mejor sus titulares.
+- **Fuentes oficiales chilenas**: BCCh, CMF, INE y Hacienda no publican RSS
+  (sus paginas de prensa no tienen enlaces de feed; la de BCCh no entrega
+  contenido sin JavaScript). Sumarlas exige scraping de HTML; `AGENTS.md`
+  pide preferir RSS. Los datos del BCCh (TPM, IPC, desempleo) ya llegan por
+  su API.
+
+## 4. Pendiente
+
+1. **Conjunto de control nuevo**: etiquetar 50-100 notas de otra semana para
+   medir sin sesgo, y que alguien del club revise las etiquetas existentes.
+2. **Errores que quedan** (ver `--details`): IPO de Anthropic (empresa, no
+   macro) rechazada; notas de MarketWatch con "inflation" en el resumen
+   ("Switching jobs to get higher pay...") pasan; la region de medios
+   chilenos que hablan de otros paises ("EEUU retira amenaza...") a veces
+   queda mal. "China" como termino de alta senal deja pasar ensayos ("China,
+   America and the new Great Game").
+3. **Modelo como calificador (Kev o similar)**: no implementado porque no se
+   pudo medir (sin GPU para Kev y sin `OLLAMA_API_KEY` en la maquina de
+   desarrollo). Para probarlo: un modulo que haga las preguntas si/no,
+   opcion y escala sobre los candidatos que pasan las reglas, correrlo sobre
+   los dos conjuntos y activarlo solo si mejora `evaluate_news_scoring`. Si
+   falla, `warning` y se usan las reglas. Nunca agrega notas.
+4. **Monitor mas liviano** y frescura de fines de semana: siguen en
+   `NEXT_STEPS.md`.

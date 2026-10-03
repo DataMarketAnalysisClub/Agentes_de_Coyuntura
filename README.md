@@ -29,6 +29,8 @@ El MVP prioriza simpleza, bajo costo, auditoria y mantenibilidad por estudiantes
   SSH + rsync + systemd + Docker.
 - [docs/email-output.md](docs/email-output.md): estructura del email,
   comportamiento por cliente, y notas sobre el MVP.
+- [docs/news-scoring.md](docs/news-scoring.md): como se califican las
+  noticias, conjunto de evaluacion y resultados medidos.
 
 ## Arquitectura
 
@@ -464,6 +466,21 @@ futuros ver [DEPLOY.md](DEPLOY.md).
 
 Los tests actuales no dependen de APIs externas.
 
+### Evaluar la calificacion de noticias
+
+Antes y despues de cambiar reglas de `services/news_classifier.py`,
+`services/news_quality.py` o `services/impact_scoring.py`:
+
+```bash
+.venv/bin/python -m scripts.evaluate_news_scoring --details
+.venv/bin/python -m scripts.evaluate_news_scoring --file tests/fixtures/news_eval_holdout.jsonl
+```
+
+Compara las reglas contra notas reales etiquetadas a mano
+(`tests/fixtures/news_eval*.jsonl`): precision/recall del filtro de calidad,
+precision del ranking y aciertos de tema y region. `tests/test_news_scoring_eval.py`
+falla si las metricas bajan de un piso. Detalle en `docs/news-scoring.md`.
+
 ## Agregar Nuevas Fuentes
 
 1. Crea o actualiza un cliente en `data_sources/`.
@@ -472,6 +489,9 @@ Los tests actuales no dependen de APIs externas.
 4. Agrega tests con mocks o fakes.
 
 Para RSS, puedes usar `RSS_FEEDS` en `.env` con URLs separadas por coma.
+Los feeds se piden con GET condicional (`fetch_feed` en
+`data_sources/rss_news_client.py`): si el servidor responde 304, se reutilizan
+las notas de la descarga anterior. Usa `fetch_feed` tambien en clientes nuevos.
 
 ## Agregar Nuevos Activos
 

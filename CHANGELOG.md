@@ -1,6 +1,36 @@
 # Changelog
 
-## [Unreleased] - 2026-09-30
+## [Unreleased] - 2026-10-03
+
+### Cambiado (calificacion de noticias)
+Medido contra notas reales etiquetadas (`docs/news-scoring.md`). En 63 notas
+nuevas que las reglas no habian visto, el F1 del filtro de calidad subio de
+0.42 a 0.67 y el acierto de tema de 0.39 a 0.72.
+- Tema por puntaje (titular x3, resumen x1) en vez de la primera coincidencia;
+  "tasa de desocupacion"/"tasa de inflacion" ya no cuentan como "tasas" y
+  "fiscal" como fiscalia o "terreno fiscal" no cuenta como politica fiscal.
+  Vocabulario en espanol (presupuesto, crecimiento, bolsa, divisa,
+  combustibles...) y bancos centrales nuevos (BoE, BoJ, RBA, Banxico...).
+- Filtro de calidad: palabras completas (no substrings), sin el nombre de la
+  fuente en el texto evaluado; los temas macro cuentan como senal. Las fuentes
+  oficiales (Fed, BCE) tambien necesitan senal, sin contar su propio nombre.
+  Ruido nuevo filtrado: analisis tecnico intradia ("...: Live levels"),
+  finanzas personales en primera persona, notas de precio objetivo y avisos
+  de fondos. En MarketWatch/Investing.com, empleo/actividad/fiscal no bastan
+  sin un termino macro.
+- Impacto: +1/+2 si otras fuentes cubren la misma historia (antes +1 a
+  cualquier nota que compartiera tema: 159 de 160). Palabras completas;
+  "Treasury Department" ya no se asocia al Treasury 10Y.
+- Region: lideres latinoamericanos (Lula, Milei, Sheinbaum...), G7/G20/OPEP.
+
+### Agregado
+- `python -m scripts.evaluate_news_scoring` y conjuntos etiquetados en
+  `tests/fixtures/` (160 notas de desarrollo + 63 de control), con pisos de
+  calidad en `tests/test_news_scoring_eval.py`.
+- GET condicional (`ETag`/`Last-Modified`) para los feeds RSS: 5 de 7 feeds
+  responden 304 sin cambios (La Tercera y DF descargan siempre).
+- Deduplicacion con indice por palabras (compara solo titulos que comparten
+  alguna) e `is_same_story` para detectar la misma historia en otra fuente.
 
 ### Agregado (difusion del mailing)
 - Pie del brief: "¿Te reenviaron este correo? Suscribete a DMAC Brief", con
