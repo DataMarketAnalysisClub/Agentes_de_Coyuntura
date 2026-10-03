@@ -7,6 +7,14 @@ commitear y entrega los commits propuestos; el usuario los hace junto al push.
 Como `scripts/deploy.sh` despliega solo codigo commiteado, antes de desplegar
 cambios nuevos el usuario debe commitearlos.
 
+## Actualizacion 2026-10-03
+
+El usuario pospuso la auditoria de seguridad y el trabajo del servidor: el
+club compro un dominio y hara una pagina web completa mas adelante. El foco
+pasa a la calidad del brief (scraping y calificacion de noticias); ver
+`docs/news-scoring.md`. La auditoria de abajo sigue vigente para cuando se
+retome la parte web.
+
 ## Siguiente mision: auditoria completa de seguridad
 
 Desde el 2026-09-30 el proyecto tiene una superficie publica en internet (el

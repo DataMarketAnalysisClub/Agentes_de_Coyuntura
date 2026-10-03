@@ -78,6 +78,11 @@ Las imagenes embebidas (cid: y base64) ya fallaron en Outlook mobile/web
 
 ## Scraping y noticias: siguientes optimizaciones
 
+**2026-10-03:** diagnostico medido de la calificacion de noticias, evaluacion
+de Kev (descartado por ahora: requiere GPU) y hoja de ruta por fases en
+`docs/news-scoring.md`. Esa hoja de ruta reemplaza a los puntos 4 y 5 de
+esta lista como plan de trabajo.
+
 1. ~~Ampliar fuentes chilenas~~: Diario Financiero agregado (RSS de portada,
    filtrado por seccion).
 2. **GET condicional.** Guardar `ETag`/`Last-Modified` por feed y enviar
