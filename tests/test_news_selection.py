@@ -115,8 +115,10 @@ def test_select_executive_news_requires_macro_signal_for_non_official_sources() 
     assert result.rejected_quality == 1
 
 
-def _chile(title: str, url: str, now: datetime, source: str = "La Tercera Pulso", score: int = 5) -> NewsItem:
-    return NewsItem(now, source, title, url, "", "Chile", "FX", score)
+def _chile(
+    title: str, url: str, now: datetime, source: str = "La Tercera Pulso", score: int = 5, topic: str = "FX"
+) -> NewsItem:
+    return NewsItem(now, source, title, url, "", "Chile", topic, score)
 
 
 def test_guaranteed_chile_slot_replaces_lowest_ranked_headline() -> None:
@@ -144,7 +146,10 @@ def test_guaranteed_chile_slot_not_forced_when_no_chilean_news_passes_quality() 
         _news(f"Fed inflation rates signal {idx}", f"https://example.com/{idx}", now, source=f"Source {idx}")
         for idx in range(3)
     ]
-    low_quality = _chile("Gremio de laboratorios destaca potencial exportador", "https://example.com/labs", now)
+    # Tema real que le asigna `classify_topic`: un tema macro ya cuenta como senal.
+    low_quality = _chile(
+        "Gremio de laboratorios destaca potencial exportador", "https://example.com/labs", now, topic="macro general"
+    )
 
     result = select_executive_news([*items, low_quality], per_topic_limit=5)
 

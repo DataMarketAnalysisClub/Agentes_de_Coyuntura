@@ -9,6 +9,7 @@ from services.news_classifier import (
     classify_region,
     classify_topic,
     deduplicate_news,
+    is_same_story,
 )
 
 
@@ -78,7 +79,8 @@ def test_mexico_ipc_index_is_not_chilean_inflation() -> None:
         ("Fed signals two more rate cuts", "EE.UU.", "tasas"),
         ("Las tasas largas suben en Chile", "Chile", "tasas"),
         ("U.S. yields climb as jobs data beats", "EE.UU.", "tasas"),
-        ("Tasa de desempleo en EE.UU. baja", "EE.UU.", "tasas"),
+        # "tasa de desempleo" es empleo, no tasas.
+        ("Tasa de desempleo en EE.UU. baja", "EE.UU.", "empleo"),
         ("Desempleo en Chile llega a 8,7%", "Chile", "empleo"),
         ("Oil jumps on new sanctions", "Global", "commodities"),
         ("Chilean peso weakens", "Chile", "FX"),
@@ -92,3 +94,81 @@ def test_mexico_ipc_index_is_not_chilean_inflation() -> None:
 def test_classifier_matches_whole_words_and_plurals(title: str, region: str, topic: str) -> None:
     assert classify_region(title) == region
     assert classify_topic(title) == topic
+
+
+# Notas reales (2026-09-28/29) que antes caian en el primer tema de la lista.
+@pytest.mark.parametrize(
+    ("title", "summary", "topic"),
+    [
+        (
+            "Expertos aprueban plan laboral, pero piden un subsidio al empleo más “robusto”",
+            "El desempleo se ubica hoy en 9,5%. Con este plan la tasa de desocupación podría bajar cerca de un punto.",
+            "empleo",
+        ),
+        (
+            "Ministro Daniel Mas da señales de que el gasto público del Presupuesto 2027 podría superar el 1%",
+            "Sobre el plan de empleo, calculó un impacto de un punto porcentual en la tasa de desocupación.",
+            "politica fiscal",
+        ),
+        (
+            "Dólar anota mayor valor en más de un año por tensiones en Medio Oriente",
+            "La divisa estadounidense subió $8. El precio del petróleo Brent alcanzaba los US$98 por barril.",
+            "FX",
+        ),
+        (
+            "Bolsa chilena repunta tras racha de caídas y Wall Street abre al alza",
+            "La última baja del IPSA medido en dólares lo hizo borrar sus avances de 2026.",
+            "renta variable",
+        ),
+        (
+            "Santander reduce a la mitad su proyección de crecimiento de Chile en 2026 y anticipa que la inflación"
+            " tendrá su mayor avance en cuatro años",
+            "Las expectativas de inversión impulsarían la recuperación de la actividad.",
+            "actividad",
+        ),
+        (
+            "Job openings are low and hiring is weak. Why the U.S. labor market won’t get better soon.",
+            "War, high gas prices, rising interest rates and AI are keeping a lid on U.S. job creation.",
+            "empleo",
+        ),
+    ],
+)
+def test_topic_is_the_most_mentioned_weighting_the_title(title: str, summary: str, topic: str) -> None:
+    assert classify_topic(title, summary) == topic
+
+
+def test_topic_ties_keep_keyword_order() -> None:
+    # "rate" (tasas) y "fed" (bancos centrales) empatan: gana el primero de la lista.
+    assert classify_topic("Fed signals two more rate cuts") == "tasas"
+
+
+def test_latam_leaders_mark_region_without_naming_the_country() -> None:
+    title = "Lula y Flávio Bolsonaro empatan en las encuestas a días de la primera vuelta presidencial"
+
+    assert classify_region(title, default="Chile") == "Latam"
+
+
+def test_same_story_matches_paraphrased_titles_but_not_unrelated_ones() -> None:
+    assert is_same_story(
+        "Fed’s Barr says more rate hikes likely to be needed to curb inflation",
+        "Fed’s Barr signals more rate hikes needed amid inflation risks",
+    )
+    assert not is_same_story(
+        "Fed’s Barr says more rate hikes likely to be needed to curb inflation",
+        "BOE’s Taylor urges caution on rate hikes as second-round inflation risks lag",
+    )
+    # Titulos cortos: solo cuenta la similitud de texto.
+    assert not is_same_story("Oil rises", "Oil falls")
+
+
+def test_deduplicate_news_keeps_first_and_compares_only_titles_sharing_words() -> None:
+    now = datetime.now(UTC)
+    items = [
+        RawNewsItem(now, "A", "Copper hits record on supply fears", "https://example.com/1", ""),
+        RawNewsItem(now, "B", "Copper hits record on supply fear", "https://example.com/2", ""),
+        RawNewsItem(now, "C", "Bolsa chilena repunta", "https://example.com/3", ""),
+        RawNewsItem(now, "D", "Fed", "https://example.com/4", ""),
+        RawNewsItem(now, "E", "Fed.", "https://example.com/5", ""),
+    ]
+
+    assert [item.source for item in deduplicate_news(items)] == ["A", "C", "D"]
